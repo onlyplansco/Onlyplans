@@ -9,7 +9,7 @@ const LANGS = {
   es: {
     tagline: "Tu fin de semana, planificado.", subtitle: "Descubre planes cerca de ti o crea los tuyos con IA.",
     createPlan: "Crear mi plan", topVoted: "Más votados", random: "Aleatorio",
-    filters: ["Montaña","Playa","Ciudad","Interior","Espectáculos","Gastronomía"],
+    filters: ["Montaña","Playa","Ciudad","Pueblos","Espectáculos","Gastronomía"],
     moreFilters: "Filtros", save: "Guardar", saved: "Guardado ✓", share: "Compartir",
     doPlan: "Hacer este plan", generateNew: "Generar otro plan",
     whereFrom: "¿Desde dónde salís?", whereFromSub: "Escribe tu ciudad de origen",
@@ -28,7 +28,7 @@ const LANGS = {
     publish: "Publicar plan", thanks: "¡Plan publicado!", thanksDesc: "Ya está visible en el feed.",
     feed: "Plans", profile: "Perfil", myProfile: "Mi perfil",
     savedPlans: "Guardados", myPlans: "Mis planes", generatedLbl: "Generados",
-    language: "Idioma", langEs: "🇪🇸 Español", langCa: "🏴󠁥󠁳󠁣󠁴󠁿 Català",
+    language: "Idioma", langEs: "Castellano", langCa: "Català",
     preparing: "Preparando tu plan...",
     steps: ["Analizando tu situación...","Buscando el mejor destino...","Verificando el tiempo...","Confirmando restaurantes...","Calculando ruta y aparcamiento...","¡Plan listo!"],
     selectDay: "Selecciona un día primero", continueWith: "Continuar",
@@ -47,7 +47,7 @@ const LANGS = {
   ca: {
     tagline: "El teu cap de setmana, planificat.", subtitle: "Descobreix plans a prop teu o crea els teus amb IA.",
     createPlan: "Crear el meu pla", topVoted: "Més votats", random: "Aleatori",
-    filters: ["Muntanya","Platja","Ciutat","Interior","Espectacles","Gastronomia"],
+    filters: ["Muntanya","Platja","Ciutat","Pobles","Espectacles","Gastronomia"],
     moreFilters: "Filtres", save: "Guardar", saved: "Guardat ✓", share: "Compartir",
     doPlan: "Fer aquest pla", generateNew: "Generar un altre pla",
     whereFrom: "Des d'on sortiu?", whereFromSub: "Escriu la teva ciutat d'origen",
@@ -66,7 +66,7 @@ const LANGS = {
     publish: "Publicar pla", thanks: "Pla publicat!", thanksDesc: "Ja és visible al feed.",
     feed: "Plans", profile: "Perfil", myProfile: "El meu perfil",
     savedPlans: "Guardats", myPlans: "Els meus plans", generatedLbl: "Generats",
-    language: "Idioma", langEs: "🇪🇸 Español", langCa: "🏴󠁥󠁳󠁣󠁴󠁿 Català",
+    language: "Idioma", langEs: "Castellano", langCa: "Català",
     preparing: "Preparant el teu pla...",
     steps: ["Analitzant la teva situació...","Buscant la millor destinació...","Verificant el temps...","Confirmant restaurants...","Calculant ruta i aparcament...","Pla llest!"],
     selectDay: "Selecciona un dia primer", continueWith: "Continuar",
@@ -121,9 +121,10 @@ const db = {
   async getPlans(filter="all", sortRandom=false) {
     const order = sortRandom ? "id.asc" : "votes_count.desc";
     let url = `${SUPABASE_URL}/rest/v1/plans?is_approved=eq.true&order=${order}&limit=20`;
-    if (filter==="Montaña"||filter==="Muntanya") url+="&vibe=eq.naturaleza";
+    if (filter==="Montaña"||filter==="Muntanya"||filter==="Playa"||filter==="Platja"||filter==="Pueblos"||filter==="Pobles") url+="&vibe=eq.naturaleza";
     if (filter==="Ciudad"||filter==="Ciutat") url+="&vibe=eq.cultura";
     if (filter==="Gastronomía"||filter==="Gastronomia") url+="&vibe=eq.gastronomia";
+    if (filter==="Espectáculos"||filter==="Espectacles") url+="&vibe=eq.aventura";
     try { const r=await fetch(url,{headers:this.h}); const d=await r.json(); return Array.isArray(d)&&d.length>0?d:null; }
     catch { return null; }
   },
@@ -181,66 +182,217 @@ function Btn({ children, onClick, style={}, variant="black" }) {
 
 // ── Upload Modal ──────────────────────────────────────────────────────────────
 function UploadModal({ t, onClose }) {
+  const TOTAL_STEPS = 5;
   const [step, setStep] = useState(1);
-  const [title, setTitle] = useState("");
-  const [desc, setDesc] = useState("");
-  const [zone, setZone] = useState("");
   const [done, setDone] = useState(false);
 
+  // Step 1 — Basic info
+  const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
+
+  // Step 2 — Tags / filters
+  const [vibe, setVibe] = useState(null);
+  const [budget, setBudget] = useState(null);
+  const [transport, setTransport] = useState(null);
+  const [zone, setZone] = useState("");
+
+  // Step 3 — Stops
+  const [stops, setStops] = useState([
+    { time: "", icon: "📍", title: "", desc: "" },
+    { time: "", icon: "🍽️", title: "", desc: "" },
+    { time: "", icon: "🏠", title: "", desc: "" },
+  ]);
+
+  // Step 4 — Tips
+  const [tip1, setTip1] = useState("");
+  const [tip2, setTip2] = useState("");
+
+  const vibeOpts = [
+    { v: "naturaleza", l: "Naturaleza 🌿" },
+    { v: "cultura", l: "Cultura 🏛️" },
+    { v: "gastronomia", l: "Gastronomía 🍽️" },
+    { v: "tranquilidad", l: "Tranquilidad 😌" },
+    { v: "aventura", l: "Aventura ⚡" },
+  ];
+
+  const budgetOpts = [
+    { v: "low", l: "Económico · <30€" },
+    { v: "mid", l: "Normal · 30-80€" },
+    { v: "high", l: "Sin límite · >80€" },
+  ];
+
+  const updateStop = (i, field, val) => {
+    const s = [...stops];
+    s[i] = { ...s[i], [field]: val };
+    setStops(s);
+  };
+
+  const addStop = () => setStops([...stops, { time: "", icon: "📍", title: "", desc: "" }]);
+  const removeStop = (i) => stops.length > 2 && setStops(stops.filter((_, idx) => idx !== i));
+
   const handlePublish = async () => {
-    await db.submitPlan({ title, subtitle:desc, zone, is_ai_generated:false });
+    const planData = {
+      title,
+      subtitle,
+      zone,
+      vibe,
+      budget,
+      transport,
+      group_type: "amigos",
+      is_ai_generated: false,
+      stops: stops.filter(s => s.title.trim()).map(s => ({ ...s, tag: "Parada", tagColor: "accent" })),
+      tips: [tip1, tip2].filter(Boolean),
+    };
+    await db.submitPlan(planData);
     setDone(true);
   };
 
+  const canNext1 = title.trim().length > 3;
+  const canNext2 = vibe && budget && transport && zone.trim();
+  const canNext3 = stops.filter(s => s.title.trim()).length >= 2;
+  const canPublish = tip1.trim() || true;
+
+  const inputStyle = (val) => ({
+    background: C.bg, border: `1.5px solid ${val ? C.accent : C.border}`,
+    borderRadius: 12, padding: "12px 14px", fontSize: 14, color: C.text,
+    outline: "none", fontFamily: FONT.body, width: "100%", transition: "border-color 0.2s",
+    boxSizing: "border-box",
+  });
+
+  const ChipRow = ({ label, opts, val, set }) => (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>{label}</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {opts.map(o => (
+          <button key={o.v} onClick={() => set(val === o.v ? null : o.v)}
+            style={{ background: val === o.v ? C.black : C.bg, color: val === o.v ? C.white : C.muted, border: `1.5px solid ${val === o.v ? C.black : C.border}`, borderRadius: 20, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT.body, transition: "all 0.15s" }}>
+            {o.l}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
-    <div style={{ position:"fixed", inset:0, background:C.overlay, zIndex:300, display:"flex", alignItems:"flex-end", justifyContent:"center" }} onClick={onClose}>
-      <div style={{ background:C.card, borderRadius:"20px 20px 0 0", padding:24, width:"100%", maxWidth:480, maxHeight:"85vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
-        <div style={{ width:36, height:4, background:C.border, borderRadius:2, margin:"0 auto 20px" }} />
+    <div style={{ position: "fixed", inset: 0, background: C.overlay, zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={onClose}>
+      <div style={{ background: C.card, borderRadius: "20px 20px 0 0", padding: 24, width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
+        <div style={{ width: 36, height: 4, background: C.border, borderRadius: 2, margin: "0 auto 20px" }} />
+
         {done ? (
-          <div style={{ textAlign:"center", padding:"20px 0" }}>
-            <div style={{ fontSize:56, marginBottom:16 }}>🎉</div>
-            <div style={{ fontFamily:FONT.display, fontSize:22, fontWeight:800, color:C.black, marginBottom:8 }}>{t.thanks}</div>
-            <div style={{ fontSize:14, color:C.muted, marginBottom:24 }}>{t.thanksDesc}</div>
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontSize: 56, marginBottom: 16 }}>🎉</div>
+            <div style={{ fontFamily: FONT.display, fontSize: 22, fontWeight: 800, color: C.black, marginBottom: 8 }}>{t.thanks}</div>
+            <div style={{ fontSize: 14, color: C.muted, marginBottom: 24 }}>{t.thanksDesc}</div>
             <Btn onClick={onClose} variant="black">{t.close}</Btn>
           </div>
         ) : (
           <>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
-              <span style={{ fontFamily:FONT.display, fontSize:18, fontWeight:800, color:C.black }}>
-                {step===1?t.descPlan:step===2?t.zoneLbl:"Confirmar"}
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontFamily: FONT.display, fontSize: 18, fontWeight: 800, color: C.black }}>
+                {step === 1 ? "¿De qué va el plan?" : step === 2 ? "¿Cómo es el plan?" : step === 3 ? "Las paradas del día" : step === 4 ? "Consejos útiles" : "Confirmar y publicar"}
               </span>
-              <span style={{ fontSize:12, color:C.dim }}>{step}/3</span>
+              <span style={{ fontSize: 12, color: C.dim, fontWeight: 600 }}>{step}/{TOTAL_STEPS}</span>
             </div>
-            {step===1 && (
-              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Título del plan" style={{ background:C.bg, border:`1.5px solid ${title?C.accent:C.border}`, borderRadius:12, padding:"14px 16px", fontSize:14, color:C.text, outline:"none", fontFamily:FONT.body, transition:"border-color 0.2s" }} />
-                <textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Describe el plan: lugares, actividades, restaurante recomendado..." style={{ background:C.bg, border:`1.5px solid ${C.border}`, borderRadius:12, padding:"14px 16px", fontSize:14, color:C.text, outline:"none", fontFamily:FONT.body, minHeight:100, resize:"none" }} />
-                <Btn onClick={()=>title.trim()&&setStep(2)} variant={title.trim()?"black":"ghost"} style={{ width:"100%" }}>{t.next}</Btn>
+
+            {/* Progress bar */}
+            <div style={{ height: 3, background: C.border, borderRadius: 2, marginBottom: 20 }}>
+              <div style={{ height: "100%", width: `${(step / TOTAL_STEPS) * 100}%`, background: C.accent, borderRadius: 2, transition: "width 0.3s" }} />
+            </div>
+
+            {/* Step 1 — Title & subtitle */}
+            {step === 1 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>Título del plan</div>
+                  <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Ej: Amanecer en Montserrat + Viñedos Penedès" style={inputStyle(title)} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>Subtítulo <span style={{ fontWeight: 400, textTransform: "none" }}>(opcional)</span></div>
+                  <input value={subtitle} onChange={e => setSubtitle(e.target.value)} placeholder="Ej: Montaña sagrada, vistas únicas y vino de la tierra" style={inputStyle(subtitle)} />
+                </div>
+                <Btn onClick={() => canNext1 && setStep(2)} variant={canNext1 ? "black" : "ghost"} style={{ width: "100%", padding: "14px", borderRadius: 14, marginTop: 8 }}>{t.next}</Btn>
               </div>
             )}
-            {step===2 && (
-              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                <input value={zone} onChange={e=>setZone(e.target.value)} placeholder="Zona (ej: Girona · 1h 30min desde Barcelona)" style={{ background:C.bg, border:`1.5px solid ${C.border}`, borderRadius:12, padding:"14px 16px", fontSize:14, color:C.text, outline:"none", fontFamily:FONT.body }} />
-                <div style={{ background:C.bg, border:`1.5px dashed ${C.border}`, borderRadius:14, padding:20, textAlign:"center" }}>
-                  <div style={{ fontSize:28, marginBottom:8 }}>🎥</div>
-                  <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:4 }}>Fotos y vídeos</div>
-                  <div style={{ fontSize:12, color:C.muted }}>Próximamente · Hasta 10 clips de 5s</div>
+
+            {/* Step 2 — Tags */}
+            {step === 2 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <ChipRow label="Tipo de plan" opts={vibeOpts} val={vibe} set={setVibe} />
+                <ChipRow label="Presupuesto por persona" opts={budgetOpts} val={budget} set={setBudget} />
+                <ChipRow label="Transporte" opts={[{ v: "yes", l: "Con coche 🚗" }, { v: "no", l: "Sin coche 🚇" }]} val={transport} set={setTransport} />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>Zona / destino</div>
+                  <input value={zone} onChange={e => setZone(e.target.value)} placeholder="Ej: Girona · 1h 30min desde Barcelona" style={inputStyle(zone)} />
                 </div>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-                  <Btn onClick={()=>setStep(1)} variant="ghost">{t.back}</Btn>
-                  <Btn onClick={()=>setStep(3)} variant="black">{t.next}</Btn>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
+                  <Btn onClick={() => setStep(1)} variant="ghost">{t.back}</Btn>
+                  <Btn onClick={() => canNext2 && setStep(3)} variant={canNext2 ? "black" : "ghost"}>{t.next}</Btn>
                 </div>
               </div>
             )}
-            {step===3 && (
-              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                <div style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:14, padding:16 }}>
-                  <div style={{ fontSize:15, fontWeight:700, color:C.black, marginBottom:6 }}>{title}</div>
-                  <div style={{ fontSize:13, color:C.muted, marginBottom:4 }}>{desc}</div>
-                  {zone && <div style={{ fontSize:12, color:C.muted }}>📍 {zone}</div>}
+
+            {/* Step 3 — Stops */}
+            {step === 3 && (
+              <div>
+                <p style={{ fontSize: 13, color: C.muted, marginBottom: 16, lineHeight: 1.5 }}>Añade las paradas del día en orden. Mínimo 2. La primera debería ser la salida y la última la vuelta.</p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 14 }}>
+                  {stops.map((stop, i) => (
+                    <div key={i} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: C.black, fontFamily: FONT.display }}>Parada {i + 1}</span>
+                        {stops.length > 2 && <button onClick={() => removeStop(i)} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: 18 }}>×</button>}
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 8, marginBottom: 8 }}>
+                        <input value={stop.time} onChange={e => updateStop(i, "time", e.target.value)} placeholder="10:00" style={{ ...inputStyle(stop.time), padding: "10px 12px" }} />
+                        <input value={stop.title} onChange={e => updateStop(i, "title", e.target.value)} placeholder="Nombre del lugar" style={{ ...inputStyle(stop.title), padding: "10px 12px" }} />
+                      </div>
+                      <textarea value={stop.desc} onChange={e => updateStop(i, "desc", e.target.value)} placeholder="Descripción práctica: cómo llegar, qué hacer, precio aproximado..." style={{ ...inputStyle(stop.desc), minHeight: 70, resize: "none", padding: "10px 12px" }} />
+                    </div>
+                  ))}
                 </div>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-                  <Btn onClick={()=>setStep(2)} variant="ghost">{t.back}</Btn>
+                <button onClick={addStop} style={{ background: "transparent", border: `1.5px dashed ${C.border}`, borderRadius: 12, padding: "12px", width: "100%", fontSize: 13, fontWeight: 600, color: C.muted, cursor: "pointer", fontFamily: FONT.body, marginBottom: 14 }}>
+                  + Añadir parada
+                </button>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <Btn onClick={() => setStep(2)} variant="ghost">{t.back}</Btn>
+                  <Btn onClick={() => canNext3 && setStep(4)} variant={canNext3 ? "black" : "ghost"}>{t.next}</Btn>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4 — Tips */}
+            {step === 4 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <p style={{ fontSize: 13, color: C.muted, marginBottom: 4, lineHeight: 1.5 }}>Comparte consejos prácticos que no están en Google. Opcionales pero muy valorados.</p>
+                <input value={tip1} onChange={e => setTip1(e.target.value)} placeholder="Consejo 1 · Ej: Reserva el teleférico online" style={inputStyle(tip1)} />
+                <input value={tip2} onChange={e => setTip2(e.target.value)} placeholder="Consejo 2 · Ej: Mejor ir entre semana" style={inputStyle(tip2)} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
+                  <Btn onClick={() => setStep(3)} variant="ghost">{t.back}</Btn>
+                  <Btn onClick={() => setStep(5)} variant="black">{t.next}</Btn>
+                </div>
+              </div>
+            )}
+
+            {/* Step 5 — Confirm */}
+            {step === 5 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: C.black, marginBottom: 4, fontFamily: FONT.display }}>{title}</div>
+                  {subtitle && <div style={{ fontSize: 13, color: C.muted, marginBottom: 8 }}>{subtitle}</div>}
+                  <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>📍 {zone}</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                    {vibe && <span style={{ fontSize: 11, fontWeight: 700, color: C.tagGreen.text, background: C.tagGreen.bg, padding: "3px 9px", borderRadius: 20, textTransform: "uppercase" }}>{vibeOpts.find(o => o.v === vibe)?.l}</span>}
+                    {budget && <span style={{ fontSize: 11, fontWeight: 700, color: C.tagMuted.text, background: C.tagMuted.bg, padding: "3px 9px", borderRadius: 20, textTransform: "uppercase" }}>{budgetOpts.find(o => o.v === budget)?.l}</span>}
+                    {transport && <span style={{ fontSize: 11, fontWeight: 700, color: C.tagAccent.text, background: C.tagAccent.bg, padding: "3px 9px", borderRadius: 20, textTransform: "uppercase" }}>{transport === "yes" ? "Con coche 🚗" : "Sin coche 🚇"}</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: C.muted }}>{stops.filter(s => s.title).length} paradas · {[tip1, tip2].filter(Boolean).length} consejos</div>
+                </div>
+                <div style={{ background: C.accent + "20", border: `1px solid ${C.accent}`, borderRadius: 12, padding: 12, fontSize: 13, color: C.accentText }}>
+                  ✓ Tu plan aparecerá en el feed inmediatamente
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <Btn onClick={() => setStep(4)} variant="ghost">{t.back}</Btn>
                   <Btn onClick={handlePublish} variant="accent">{t.publish} ✓</Btn>
                 </div>
               </div>
@@ -406,8 +558,23 @@ function FeedScreen({ t, go, onPlanClick, onUpload }) {
   const fetchPlans = async (f, rand) => {
     setLoading(true);
     const data = await db.getPlans(f, rand);
-    let result = data || MOCK;
-    if (rand) result = [...result].sort(()=>Math.random()-0.5);
+    let result;
+    if (data) {
+      result = data;
+    } else {
+      // Filter MOCK data locally
+      result = MOCK.filter(p => {
+        if (f === "all") return true;
+        if (f === "Montaña" || f === "Muntanya") return p.vibe === "naturaleza" && (p.title.toLowerCase().includes("montserrat") || p.title.toLowerCase().includes("garrotxa") || p.title.toLowerCase().includes("delta") || p.emoji === "⛰️");
+        if (f === "Playa" || f === "Platja") return p.vibe === "naturaleza" && (p.title.toLowerCase().includes("costa") || p.title.toLowerCase().includes("barceloneta") || p.emoji === "🏖️");
+        if (f === "Ciudad" || f === "Ciutat") return p.vibe === "cultura" && p.transport === "no";
+        if (f === "Pueblos" || f === "Pobles") return p.title.toLowerCase().includes("besalú") || p.title.toLowerCase().includes("pals") || p.emoji === "🏰";
+        if (f === "Gastronomía" || f === "Gastronomia") return p.vibe === "gastronomia";
+        return true;
+      });
+      if (result.length === 0) result = MOCK;
+    }
+    if (rand) result = [...result].sort(() => Math.random() - 0.5);
     setPlans(result);
     setLoading(false);
   };
@@ -486,11 +653,18 @@ function FeedScreen({ t, go, onPlanClick, onUpload }) {
 }
 
 // ── Plan Detail ───────────────────────────────────────────────────────────────
-function PlanDetail({ plan, t, onBack, onDoPlan }) {
+function PlanDetail({ plan, t, onBack, onDoPlan, onRequireAuth, isLoggedIn }) {
   const [saved, setSaved] = useState(false);
+  const [planDone, setPlanDone] = useState(false);
   const [reported, setReported] = useState(false);
   const [reportTxt, setReportTxt] = useState("");
   const [showReport, setShowReport] = useState(false);
+
+  const handleDoPlan = () => {
+    if (!isLoggedIn) { onRequireAuth(); return; }
+    setSaved(true);
+    setPlanDone(true);
+  };
 
   return (
     <div style={{ minHeight:"100vh", background:C.bg, paddingTop:52, paddingBottom:40 }}>
@@ -515,7 +689,9 @@ function PlanDetail({ plan, t, onBack, onDoPlan }) {
 
         <p style={{ fontSize:14, color:C.muted, lineHeight:1.6, marginBottom:20 }}>{plan.subtitle}</p>
 
-        <Btn onClick={onDoPlan} variant="black" style={{ width:"100%", padding:"15px", fontSize:15, marginBottom:24, borderRadius:14 }}>{t.doPlan}</Btn>
+        <Btn onClick={handleDoPlan} variant="black" style={{ width:"100%", padding:"15px", fontSize:15, marginBottom:24, borderRadius:14 }}>
+          {planDone ? "✓ Plan guardado en tu perfil" : t.doPlan}
+        </Btn>
 
         {plan.stops?.length > 0 && (
           <>
@@ -795,21 +971,38 @@ function GeneratedPlan({ plan, answers, t, onBack, onRegen, go, error }) {
 }
 
 // ── Profile ───────────────────────────────────────────────────────────────────
-function ProfileScreen({ t, go, lang, setLang, onUpload }) {
+function ProfileScreen({ t, go, lang, setLang, onUpload, isLoggedIn, onLogin }) {
+  if (!isLoggedIn) {
+    return (
+      <div style={{ minHeight:"100vh", background:C.bg, paddingTop:52, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"80px 24px 40px" }}>
+        <div style={{ fontSize:56, marginBottom:20 }}>👤</div>
+        <h2 style={{ fontFamily:FONT.display, fontSize:22, fontWeight:900, color:C.black, marginBottom:10, textAlign:"center" }}>Crea tu cuenta</h2>
+        <p style={{ fontSize:14, color:C.muted, textAlign:"center", marginBottom:32, lineHeight:1.6 }}>
+          Regístrate para guardar planes, subir los tuyos y llevar un historial de tus escapadas.
+        </p>
+        <Btn onClick={onLogin} variant="black" style={{ width:"100%", maxWidth:320, padding:"15px", fontSize:15, borderRadius:14, marginBottom:12 }}>
+          Crear cuenta
+        </Btn>
+        <button onClick={onLogin} style={{ background:"transparent", border:"none", color:C.muted, fontSize:14, cursor:"pointer", fontFamily:FONT.body }}>
+          Ya tengo cuenta · Iniciar sesión
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight:"100vh", background:C.bg, paddingTop:52, paddingBottom:40 }}>
       <div style={{ padding:"24px 16px" }}>
         <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
-          <div style={{ width:60, height:60, borderRadius:"50%", background:C.accent, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, fontWeight:900, color:C.accentText, fontFamily:FONT.display }}>G</div>
+          <div style={{ width:60, height:60, borderRadius:"50%", background:C.accent, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, fontWeight:900, color:C.accentText, fontFamily:FONT.display }}>👤</div>
           <div>
-            <div style={{ fontFamily:FONT.display, fontSize:18, fontWeight:900, color:C.black }}>{t.myProfile}</div>
+            <div style={{ fontFamily:FONT.display, fontSize:18, fontWeight:900, color:C.black }}>Mi perfil</div>
             <div style={{ fontSize:13, color:C.muted }}>onlyplansco.com</div>
           </div>
         </div>
 
-        {/* Stats */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:24 }}>
-          {[{n:"4",l:t.generatedLbl},{n:"2",l:t.savedPlans},{n:"1",l:t.myPlans}].map((s,i)=>(
+          {[{n:"0",l:t.generatedLbl},{n:"0",l:t.savedPlans},{n:"0",l:t.myPlans}].map((s,i)=>(
             <div key={i} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:"14px 8px", textAlign:"center" }}>
               <div style={{ fontFamily:FONT.display, fontSize:26, fontWeight:900, color:C.accent }}>{s.n}</div>
               <div style={{ fontSize:11, color:C.muted, lineHeight:1.3, marginTop:4 }}>{s.l}</div>
@@ -817,27 +1010,15 @@ function ProfileScreen({ t, go, lang, setLang, onUpload }) {
           ))}
         </div>
 
-        {/* Add plan from profile */}
         <Btn onClick={onUpload} variant="accent" style={{ width:"100%", padding:"14px", fontSize:14, borderRadius:14, marginBottom:24 }}>
           📝 {t.addPlanFromProfile}
         </Btn>
 
-        {/* Saved plans */}
-        <h2 style={{ fontFamily:FONT.display, fontSize:15, fontWeight:800, color:C.black, marginBottom:12 }}>{t.savedPlans}</h2>
-        <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:28 }}>
-          {MOCK.slice(0,2).map(p=>(
-            <div key={p.id} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:12, display:"flex", alignItems:"center", gap:12 }}>
-              <img src={p.img} alt="" style={{ width:48, height:48, borderRadius:10, objectFit:"cover" }} onError={e=>e.target.style.display="none"}/>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:C.black, marginBottom:2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", fontFamily:FONT.display }}>{p.title}</div>
-                <div style={{ fontSize:11, color:C.muted }}>{p.zone}</div>
-              </div>
-              <span style={{ fontSize:16 }}>🔖</span>
-            </div>
-          ))}
+        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:20, marginBottom:24, textAlign:"center" }}>
+          <div style={{ fontSize:32, marginBottom:10 }}>🗺️</div>
+          <div style={{ fontSize:14, color:C.muted }}>Aún no tienes planes guardados. ¡Empieza a explorar!</div>
         </div>
 
-        {/* Language */}
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:16 }}>
           <div style={{ fontSize:13, fontWeight:800, color:C.black, marginBottom:14, fontFamily:FONT.display }}>🌐 {t.language}</div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
@@ -846,6 +1027,52 @@ function ProfileScreen({ t, go, lang, setLang, onUpload }) {
             ))}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Auth Modal ────────────────────────────────────────────────────────────────
+function AuthModal({ t, onClose, onSuccess }) {
+  const [isLogin, setIsLogin] = useState(false);
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [done, setDone] = useState(false);
+
+  const handleSubmit = () => {
+    if (!email.trim()) return;
+    setDone(true);
+    setTimeout(() => { onSuccess({ email, name: name || email.split("@")[0] }); onClose(); }, 1000);
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:C.overlay, zIndex:400, display:"flex", alignItems:"flex-end", justifyContent:"center" }} onClick={onClose}>
+      <div style={{ background:C.card, borderRadius:"20px 20px 0 0", padding:24, width:"100%", maxWidth:480 }} onClick={e=>e.stopPropagation()}>
+        <div style={{ width:36, height:4, background:C.border, borderRadius:2, margin:"0 auto 20px" }} />
+        <h2 style={{ fontFamily:FONT.display, fontSize:20, fontWeight:900, color:C.black, marginBottom:6 }}>
+          {isLogin ? "Iniciar sesión" : "Crear cuenta"}
+        </h2>
+        <p style={{ fontSize:13, color:C.muted, marginBottom:20 }}>Para guardar planes y subir los tuyos</p>
+
+        {!done ? (
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            {!isLogin && (
+              <input value={name} onChange={e=>setName(e.target.value)} placeholder="Tu nombre" style={{ background:C.bg, border:`1.5px solid ${C.border}`, borderRadius:12, padding:"14px 16px", fontSize:14, color:C.text, outline:"none", fontFamily:FONT.body }} />
+            )}
+            <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Tu email" type="email" style={{ background:C.bg, border:`1.5px solid ${email?C.accent:C.border}`, borderRadius:12, padding:"14px 16px", fontSize:14, color:C.text, outline:"none", fontFamily:FONT.body, transition:"border-color 0.2s" }} />
+            <Btn onClick={handleSubmit} variant="black" style={{ width:"100%", padding:"15px", fontSize:15, borderRadius:14 }}>
+              {isLogin ? "Entrar" : "Crear cuenta"}
+            </Btn>
+            <button onClick={()=>setIsLogin(!isLogin)} style={{ background:"transparent", border:"none", color:C.muted, fontSize:13, cursor:"pointer", fontFamily:FONT.body }}>
+              {isLogin ? "¿No tienes cuenta? Regístrate" : "¿Ya tienes cuenta? Inicia sesión"}
+            </button>
+          </div>
+        ) : (
+          <div style={{ textAlign:"center", padding:"20px 0" }}>
+            <div style={{ fontSize:48, marginBottom:12 }}>✓</div>
+            <div style={{ fontSize:16, fontWeight:700, color:C.black }}>¡Bienvenido/a!</div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -861,9 +1088,18 @@ export default function App() {
   const [planError, setPlanError] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const [user, setUser] = useState(null);
   const t = LANGS[lang];
 
   const go = s => { setScreen(s); window.scrollTo(0,0); };
+
+  const requireAuth = () => setShowAuth(true);
+
+  const handleUpload = () => {
+    if (!user) { setShowAuth(true); return; }
+    setShowUpload(true);
+  };
 
   const handleQuizComplete = async ans => {
     setAnswers(ans);
@@ -900,13 +1136,14 @@ export default function App() {
       `}</style>
 
       {showUpload && <UploadModal t={t} onClose={()=>setShowUpload(false)}/>}
+      {showAuth && <AuthModal t={t} onClose={()=>setShowAuth(false)} onSuccess={u=>{ setUser(u); setShowAuth(false); }}/>}
 
       {screen!=="loading" && (
-        <TopNav screen={screen} go={go} t={t} onCreatePlan={()=>go("time")} onUpload={()=>setShowUpload(true)}/>
+        <TopNav screen={screen} go={go} t={t} onCreatePlan={()=>go("time")} onUpload={handleUpload}/>
       )}
 
-      {screen==="feed" && <FeedScreen t={t} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail");}} onUpload={()=>setShowUpload(true)}/>}
-      {screen==="detail" && selectedPlan && <PlanDetail plan={selectedPlan} t={t} onBack={()=>go("feed")} onDoPlan={()=>go("time")}/>}
+      {screen==="feed" && <FeedScreen t={t} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail");}} onUpload={handleUpload}/>}
+      {screen==="detail" && selectedPlan && <PlanDetail plan={selectedPlan} t={t} onBack={()=>go("feed")} onDoPlan={()=>go("time")} onRequireAuth={requireAuth} isLoggedIn={!!user}/>}
       {screen==="time" && (
         <div style={{ minHeight:"100vh", background:C.bg, paddingTop:52 }}>
           <div style={{ padding:"20px 16px" }}>
@@ -920,7 +1157,7 @@ export default function App() {
       {screen==="quiz" && <QuizScreen t={t} timeData={timeData} onComplete={handleQuizComplete} onBack={()=>go("time")}/>}
       {screen==="loading" && <LoadingScreen t={t}/>}
       {screen==="generated" && <GeneratedPlan plan={generatedPlan} answers={answers} t={t} onBack={()=>go("feed")} onRegen={handleRegen} go={go} error={planError}/>}
-      {screen==="profile" && <ProfileScreen t={t} go={go} lang={lang} setLang={setLang} onUpload={()=>setShowUpload(true)}/>}
+      {screen==="profile" && <ProfileScreen t={t} go={go} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={()=>setShowAuth(true)}/>}
     </div>
   );
 }
