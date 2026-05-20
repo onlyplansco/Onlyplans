@@ -117,9 +117,10 @@ const QUESTIONS = [
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const db = {
   h: { apikey: SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}`, "Content-Type":"application/json" },
+  authH: (token) => ({ apikey: SUPABASE_KEY, Authorization:`Bearer ${token}`, "Content-Type":"application/json" }),
   async getPlans(filter="all", sortRandom=false) {
-    const order = sortRandom ? "id.asc" : "votes_count.desc";
-    let url = `${SUPABASE_URL}/rest/v1/plans?is_approved=eq.true&order=${order}&limit=20`;
+    const order = sortRandom ? "random" : "votes_count.desc";
+    let url = `${SUPABASE_URL}/rest/v1/plans?is_approved=eq.true&order=votes_count.desc&limit=20`;
     if (filter==="Montaña"||filter==="Muntanya"||filter==="Playa"||filter==="Platja"||filter==="Pueblos"||filter==="Pobles") url+="&vibe=eq.naturaleza";
     if (filter==="Ciudad"||filter==="Ciutat") url+="&vibe=eq.cultura";
     if (filter==="Gastronomía"||filter==="Gastronomia") url+="&vibe=eq.gastronomia";
@@ -131,9 +132,35 @@ const db = {
     try { await fetch(`${SUPABASE_URL}/rest/v1/plans`,{method:"POST",headers:this.h,body:JSON.stringify({...data,is_approved:true,votes_count:0})}); return true; }
     catch { return false; }
   },
-  async savePlan(plan,answers) {
-    try { await fetch(`${SUPABASE_URL}/rest/v1/plans`,{method:"POST",headers:this.h,body:JSON.stringify({title:plan.title,subtitle:plan.subtitle,zone:plan.zone,stops:plan.stops,tips:plan.tips,emoji:plan.emoji,budget:answers?.budget,transport:answers?.transport,vibe:answers?.vibe,group_type:answers?.group,is_ai_generated:true,is_approved:true,votes_count:0})}); }
-    catch {}
+  async savePlanToProfile(plan, token) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/saved_plans`, {
+        method: "POST",
+        headers: this.authH(token),
+        body: JSON.stringify({ plan_id: plan.id }),
+      });
+      return true;
+    } catch { return false; }
+  },
+  async saveGeneratedPlan(plan, answers, token) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/plans`, {
+        method: "POST",
+        headers: { ...this.authH(token), Prefer: "return=representation" },
+        body: JSON.stringify({ title:plan.title, subtitle:plan.subtitle, zone:plan.zone, stops:plan.stops, tips:plan.tips, emoji:plan.emoji, budget:answers?.budget, transport:answers?.transport, vibe:answers?.vibe, group_type:answers?.group, is_ai_generated:true, is_approved:true, votes_count:0 }),
+      });
+      const d = await r.json();
+      return Array.isArray(d) ? d[0] : d;
+    } catch { return null; }
+  },
+  async getSavedPlans(token) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/saved_plans?select=plan_id,plans(*)&order=created_at.desc`, {
+        headers: this.authH(token),
+      });
+      const d = await r.json();
+      return Array.isArray(d) ? d.map(x => x.plans).filter(Boolean) : [];
+    } catch { return []; }
   },
   async report(desc) {
     try { await fetch(`${SUPABASE_URL}/rest/v1/incidents`,{method:"POST",headers:this.h,body:JSON.stringify({description:desc})}); }
@@ -490,12 +517,19 @@ function TopNav({ screen, go, t, onCreatePlan, onUpload }) {
 }
 
 // ── Feed Card ─────────────────────────────────────────────────────────────────
-function FeedCard({ plan, t, onClick }) {
+function FeedCard({ plan, t, onClick, user, onRequireAuth }) {
   const [saved, setSaved] = useState(false);
   const [votes, setVotes] = useState(plan.votes_count||0);
   const [voted, setVoted] = useState(false);
 
   const budgetLabel = { low:"Económico", mid:"Normal", high:"Sin límite" };
+
+  const handleSave = async (e) => {
+    e.stopPropagation();
+    if (!user) { onRequireAuth(); return; }
+    setSaved(!saved);
+    if (!saved && plan.id) await db.savePlanToProfile(plan, user.token);
+  };
 
   return (
     <div onClick={onClick} style={{ background:C.card, borderRadius:18, overflow:"hidden", boxShadow:"0 1px 12px rgba(0,0,0,0.05)", cursor:"pointer", transition:"transform 0.2s, box-shadow 0.2s", marginBottom:14 }}
@@ -510,7 +544,7 @@ function FeedCard({ plan, t, onClick }) {
         <div style={{ position:"absolute", top:12, left:12, background:"rgba(255,255,255,0.88)", backdropFilter:"blur(8px)", borderRadius:20, padding:"4px 11px", fontSize:11, fontWeight:600, color:C.black }}>
           📍 {plan.zone}
         </div>
-        <button onClick={e=>{e.stopPropagation();setSaved(!saved);}} style={{ position:"absolute", top:10, right:10, background:"rgba(255,255,255,0.88)", backdropFilter:"blur(8px)", border:"none", borderRadius:"50%", width:34, height:34, cursor:"pointer", fontSize:15, display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.2s" }}>
+        <button onClick={handleSave} style={{ position:"absolute", top:10, right:10, background:saved?"rgba(181,217,106,0.9)":"rgba(255,255,255,0.88)", backdropFilter:"blur(8px)", border:"none", borderRadius:"50%", width:34, height:34, cursor:"pointer", fontSize:15, display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.2s" }}>
           {saved?"🔖":"🤍"}
         </button>
         <div style={{ position:"absolute", bottom:10, left:12, fontSize:28 }}>{plan.emoji}</div>
@@ -543,7 +577,7 @@ function FeedCard({ plan, t, onClick }) {
 }
 
 // ── Feed Screen ───────────────────────────────────────────────────────────────
-function FeedScreen({ t, go, onPlanClick, onUpload }) {
+function FeedScreen({ t, go, onPlanClick, onUpload, user, onRequireAuth }) {
   const [filter, setFilter] = useState("all");
   const [sortRandom, setSortRandom] = useState(false);
   const [plans, setPlans] = useState(MOCK);
@@ -634,7 +668,7 @@ function FeedScreen({ t, go, onPlanClick, onUpload }) {
             Cargando planes...
           </div>
         ) : (
-          plans.map(plan => <FeedCard key={plan.id} plan={plan} t={t} onClick={()=>onPlanClick(plan)}/>)
+          plans.map(plan => <FeedCard key={plan.id} plan={plan} t={t} onClick={()=>onPlanClick(plan)} user={user} onRequireAuth={onRequireAuth}/>)
         )}
 
         {/* Upload CTA */}
@@ -749,63 +783,107 @@ function TimeSelector({ t, onComplete }) {
   const [end, setEnd] = useState(null);
   const [sh, setSh] = useState(9);
   const [eh, setEh] = useState(20);
-  const today = new Date().getDate();
-  const days = 31; const fd = 3;
-  const fmt = h=>`${String(h).padStart(2,"0")}:00`;
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const today = now.getDate();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  // First day of month: 0=Sun,1=Mon... we want Mon=0
+  const rawFirst = new Date(year, month, 1).getDay();
+  const fd = rawFirst === 0 ? 6 : rawFirst - 1; // offset for Mon-first grid
+
+  const monthName = now.toLocaleString("es", { month: "long", year: "numeric" });
+  const fmt = h => `${String(h).padStart(2,"0")}:00`;
+
   const click = day => {
-    if(day<today) return;
-    if(mode==="day"){setSel(day);setEnd(day);}
-    else if(mode==="weekend"){const dow=new Date(2026,4,day).getDay();const sat=dow===6?day:dow===0?day-1:day+(6-dow);setSel(Math.min(sat,days));setEnd(Math.min(sat+1,days));}
-    else{if(!sel||end){setSel(day);setEnd(null);}else{day<sel?(setEnd(sel),setSel(day)):setEnd(day);}}
+    if (day < today) return;
+    if (mode === "day") {
+      setSel(day); setEnd(day);
+    } else if (mode === "weekend") {
+      const dow = new Date(year, month, day).getDay(); // 0=Sun,6=Sat
+      let sat = day;
+      if (dow === 0) sat = day - 1; // Sunday → go to prev Saturday
+      else if (dow !== 6) sat = day + (6 - dow); // find next Saturday
+      sat = Math.min(sat, daysInMonth);
+      const sun = Math.min(sat + 1, daysInMonth);
+      setSel(sat); setEnd(sun);
+    } else {
+      if (!sel || end) { setSel(day); setEnd(null); }
+      else { day < sel ? (setEnd(sel), setSel(day)) : setEnd(day); }
+    }
   };
-  const isSel=d=>d===sel||d===end;
-  const isRange=d=>sel&&end&&end>sel&&d>sel&&d<end;
-  const dur=!sel?null:(!end||end===sel)?"1 día":end-sel+1===2?"Fin de semana":`${end-sel+1} días`;
+
+  const isSel = d => d === sel || d === end;
+  const isRange = d => sel && end && end > sel && d > sel && d < end;
+  const dur = !sel ? null : (!end || end === sel) ? "1 día" : end - sel + 1 === 2 ? "Fin de semana" : `${end - sel + 1} días`;
+  const showHours = mode !== "weekend";
+  const canContinue = sel !== null;
 
   return (
     <div>
+      {/* Mode tabs */}
       <div style={{ display:"flex", gap:8, marginBottom:18 }}>
         {[{id:"day",l:"Un día"},{id:"weekend",l:"Fin de semana"},{id:"custom",l:"Personalizado"}].map(m=>(
           <button key={m.id} onClick={()=>{setMode(m.id);setSel(null);setEnd(null);}} style={{ flex:1, background:mode===m.id?C.black:C.bg, color:mode===m.id?C.white:C.muted, border:`1.5px solid ${mode===m.id?C.black:C.border}`, borderRadius:10, padding:"10px 0", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:FONT.body }}>{m.l}</button>
         ))}
       </div>
+
+      {/* Calendar */}
       <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:16, marginBottom:14 }}>
-        <div style={{ textAlign:"center", fontSize:14, fontWeight:800, color:C.black, marginBottom:12, fontFamily:FONT.display }}>Mayo 2026</div>
+        <div style={{ textAlign:"center", fontSize:14, fontWeight:800, color:C.black, marginBottom:12, fontFamily:FONT.display, textTransform:"capitalize" }}>{monthName}</div>
+        {/* Header: Mon to Sun */}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", marginBottom:6 }}>
-          {["D","L","M","X","J","V","S"].map(d=><div key={d} style={{ textAlign:"center", fontSize:11, color:C.dim, fontWeight:700 }}>{d}</div>)}
+          {["L","M","X","J","V","S","D"].map(d=><div key={d} style={{ textAlign:"center", fontSize:11, color:C.dim, fontWeight:700 }}>{d}</div>)}
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:2 }}>
           {Array.from({length:fd},(_,i)=><div key={`e${i}`}/>)}
-          {Array.from({length:days},(_,i)=>{
-            const day=i+1;const s=isSel(day);const r=isRange(day);const past=day<today;
+          {Array.from({length:daysInMonth},(_,i)=>{
+            const day=i+1; const s=isSel(day); const r=isRange(day); const past=day<today;
             return <button key={day} onClick={()=>click(day)} style={{ aspectRatio:"1", borderRadius:8, background:s?C.accent:r?C.accent+"40":"transparent", border:day===today&&!s?`2px solid ${C.accent}`:"1px solid transparent", color:s?C.accentText:past?C.dim:C.black, fontSize:13, fontWeight:s?800:400, cursor:past?"default":"pointer", fontFamily:FONT.body }}>{day}</button>;
           })}
         </div>
-        {sel&&<div style={{ marginTop:10, textAlign:"center", fontSize:13, color:C.accentText, fontWeight:700, background:C.accent+"25", borderRadius:8, padding:"6px" }}>{mode==="custom"&&!end?"Selecciona el día de vuelta":`✓ ${dur} seleccionado`}</div>}
+        {sel && (
+          <div style={{ marginTop:10, textAlign:"center", fontSize:13, color:C.accentText, fontWeight:700, background:C.accent+"25", borderRadius:8, padding:"6px" }}>
+            {mode==="custom"&&!end ? "Selecciona el día de vuelta" : `✓ ${dur} seleccionado`}
+          </div>
+        )}
       </div>
-      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:16, marginBottom:18 }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-          <span style={{ fontSize:14, fontWeight:800, color:C.black, fontFamily:FONT.display }}>⏰ Horas disponibles</span>
-          <span style={{ fontSize:12, fontWeight:700, color:C.accentText, background:C.accent+"30", padding:"3px 10px", borderRadius:20 }}>{eh-sh}h</span>
-        </div>
-        <div style={{ height:6, background:C.border, borderRadius:3, marginBottom:12, position:"relative", overflow:"hidden" }}>
-          <div style={{ position:"absolute", left:`${(sh/23)*100}%`, width:`${((eh-sh)/23)*100}%`, height:"100%", background:C.accent, borderRadius:3 }}/>
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-          {[{label:"Desde",opts:[7,8,9,10,11,12],val:sh,set:setSh},{label:"Hasta",opts:[14,16,18,20,22,23],val:eh,set:setEh}].map(({label,opts,val,set})=>(
-            <div key={label}>
-              <div style={{ fontSize:11, color:C.muted, marginBottom:6, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5 }}>{label}</div>
-              <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
-                {opts.map(h=><button key={h} onClick={()=>set(h)} style={{ background:val===h?C.black:C.bg, color:val===h?C.white:C.muted, border:`1.5px solid ${val===h?C.black:C.border}`, borderRadius:8, padding:"5px 7px", fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:FONT.body }}>{fmt(h)}</button>)}
+
+      {/* Hours — only for day/custom */}
+      {showHours && (
+        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:16, marginBottom:18 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+            <span style={{ fontSize:14, fontWeight:800, color:C.black, fontFamily:FONT.display }}>⏰ Horas disponibles</span>
+            <span style={{ fontSize:12, fontWeight:700, color:C.accentText, background:C.accent+"30", padding:"3px 10px", borderRadius:20 }}>{eh-sh}h</span>
+          </div>
+          <div style={{ height:6, background:C.border, borderRadius:3, marginBottom:12, position:"relative", overflow:"hidden" }}>
+            <div style={{ position:"absolute", left:`${(sh/23)*100}%`, width:`${((eh-sh)/23)*100}%`, height:"100%", background:C.accent, borderRadius:3 }}/>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            {[{label:"Desde",opts:[7,8,9,10,11,12],val:sh,set:setSh},{label:"Hasta",opts:[14,16,18,20,22,23],val:eh,set:setEh}].map(({label,opts,val,set})=>(
+              <div key={label}>
+                <div style={{ fontSize:11, color:C.muted, marginBottom:6, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5 }}>{label}</div>
+                <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
+                  {opts.map(h=><button key={h} onClick={()=>set(h)} style={{ background:val===h?C.black:C.bg, color:val===h?C.white:C.muted, border:`1.5px solid ${val===h?C.black:C.border}`, borderRadius:8, padding:"5px 7px", fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:FONT.body }}>{fmt(h)}</button>)}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+          <div style={{ marginTop:12, padding:"8px", background:C.accent+"20", borderRadius:10, fontSize:13, color:C.accentText, fontWeight:700, textAlign:"center" }}>{fmt(sh)} → {fmt(eh)} · {eh-sh}h</div>
         </div>
-        <div style={{ marginTop:12, padding:"8px", background:C.accent+"20", borderRadius:10, fontSize:13, color:C.accentText, fontWeight:700, textAlign:"center" }}>{fmt(sh)} → {fmt(eh)} · {eh-sh}h</div>
-      </div>
-      <Btn onClick={()=>sel&&onComplete({date:sel,endDate:end,startHour:sh,endHour:eh,mode})} variant={sel?"black":"ghost"} style={{ width:"100%", padding:"15px", fontSize:15, borderRadius:14, opacity:sel?1:0.5 }}>
-        {sel?`${t.continueWith} ${dur} →`:t.selectDay}
-      </Btn>
+      )}
+
+      {mode === "weekend" && sel && (
+        <div style={{ background:C.accent+"15", border:`1px solid ${C.accent}`, borderRadius:14, padding:14, marginBottom:18, textAlign:"center", fontSize:13, color:C.accentText, fontWeight:600 }}>
+          🗓️ Plan para todo el fin de semana · Sábado {sel} y Domingo {end}
+        </div>
+      )}
+
+      <button onClick={() => canContinue && onComplete({ date:sel, endDate:end, startHour:sh, endHour:eh, mode })}
+        style={{ width:"100%", background:canContinue?C.black:C.border, color:canContinue?C.white:C.dim, border:"none", borderRadius:14, padding:"15px", fontSize:15, fontWeight:700, cursor:canContinue?"pointer":"default", fontFamily:FONT.display }}>
+        {canContinue ? `Continuar con ${dur} →` : "Selecciona un día primero"}
+      </button>
     </div>
   );
 }
@@ -969,6 +1047,18 @@ function GeneratedPlan({ plan, answers, t, onBack, onRegen, go, error }) {
 
 // ── Profile ───────────────────────────────────────────────────────────────────
 function ProfileScreen({ t, go, lang, setLang, onUpload, isLoggedIn, onLogin, user, onLogout }) {
+  const [savedPlans, setSavedPlans] = useState([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
+
+  useEffect(() => {
+    if (isLoggedIn && user?.token) {
+      setLoadingPlans(true);
+      db.getSavedPlans(user.token).then(plans => {
+        setSavedPlans(plans);
+        setLoadingPlans(false);
+      });
+    }
+  }, [isLoggedIn, user]);
   if (!isLoggedIn) {
     return (
       <div style={{ minHeight:"100vh", background:C.bg, paddingTop:52, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"52px 24px 40px" }}>
@@ -1015,9 +1105,29 @@ function ProfileScreen({ t, go, lang, setLang, onUpload, isLoggedIn, onLogin, us
           📝 {t.addPlanFromProfile}
         </Btn>
 
-        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:20, marginBottom:24, textAlign:"center" }}>
-          <div style={{ fontSize:32, marginBottom:10 }}>🗺️</div>
-          <div style={{ fontSize:14, color:C.muted }}>Aún no tienes planes guardados. ¡Empieza a explorar!</div>
+        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:20, marginBottom:24 }}>
+          <h3 style={{ fontFamily:FONT.display, fontSize:15, fontWeight:800, color:C.black, marginBottom:14 }}>{t.savedPlans}</h3>
+          {loadingPlans ? (
+            <div style={{ textAlign:"center", padding:20, color:C.muted, fontSize:13 }}>Cargando...</div>
+          ) : savedPlans.length > 0 ? (
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {savedPlans.map((p,i) => (
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:12, padding:"8px 0", borderBottom: i < savedPlans.length-1 ? `1px solid ${C.border}` : "none" }}>
+                  <span style={{ fontSize:24 }}>{p.emoji || "🗺️"}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:C.black, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.title}</div>
+                    <div style={{ fontSize:11, color:C.muted }}>{p.zone}</div>
+                  </div>
+                  <span style={{ fontSize:16 }}>🔖</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign:"center", padding:"20px 0" }}>
+              <div style={{ fontSize:32, marginBottom:10 }}>🗺️</div>
+              <div style={{ fontSize:14, color:C.muted }}>Aún no tienes planes guardados. ¡Empieza a explorar!</div>
+            </div>
+          )}
         </div>
 
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:16 }}>
@@ -1231,7 +1341,7 @@ export default function App() {
         <TopNav screen={screen} go={go} t={t} onCreatePlan={() => go("time")} onUpload={handleUpload} />
       )}
 
-      {screen === "feed" && <FeedScreen t={t} go={go} onPlanClick={p => { setSelectedPlan(p); go("detail"); }} onUpload={handleUpload} />}
+      {screen === "feed" && <FeedScreen t={t} go={go} onPlanClick={p => { setSelectedPlan(p); go("detail"); }} onUpload={handleUpload} user={user} onRequireAuth={requireAuth} />}
       {screen === "detail" && selectedPlan && <PlanDetail plan={selectedPlan} t={t} onBack={() => go("feed")} onDoPlan={() => go("time")} onRequireAuth={requireAuth} isLoggedIn={!!user} />}
       {screen === "time" && (
         <div style={{ minHeight: "100vh", background: C.bg, paddingTop: 52 }}>
