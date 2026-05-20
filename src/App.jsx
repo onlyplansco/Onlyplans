@@ -191,7 +191,8 @@ function UploadModal({ t, onClose }) {
   const [subtitle, setSubtitle] = useState("");
 
   // Step 2 — Tags / filters
-  const [vibe, setVibe] = useState(null);
+  const [vibes, setVibes] = useState([]);
+  const toggleVibe = (v) => setVibes(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]);
   const [budget, setBudget] = useState(null);
   const [transport, setTransport] = useState(null);
   const [zone, setZone] = useState("");
@@ -235,7 +236,7 @@ function UploadModal({ t, onClose }) {
       title,
       subtitle,
       zone,
-      vibe,
+      vibe: vibes[0] || "naturaleza",
       budget,
       transport,
       group_type: "amigos",
@@ -248,7 +249,7 @@ function UploadModal({ t, onClose }) {
   };
 
   const canNext1 = title.trim().length > 3;
-  const canNext2 = vibe && budget && transport && zone.trim();
+  const canNext2 = vibes.length > 0 && budget && transport && zone.trim();
   const canNext3 = stops.filter(s => s.title.trim()).length >= 2;
   const canPublish = tip1.trim() || true;
 
@@ -259,16 +260,19 @@ function UploadModal({ t, onClose }) {
     boxSizing: "border-box",
   });
 
-  const ChipRow = ({ label, opts, val, set }) => (
+  const ChipRow = ({ label, opts, val, set, multi }) => (
     <div style={{ marginBottom: 16 }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>{label}</div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {opts.map(o => (
-          <button key={o.v} onClick={() => set(val === o.v ? null : o.v)}
-            style={{ background: val === o.v ? C.black : C.bg, color: val === o.v ? C.white : C.muted, border: `1.5px solid ${val === o.v ? C.black : C.border}`, borderRadius: 20, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT.body, transition: "all 0.15s" }}>
-            {o.l}
-          </button>
-        ))}
+        {opts.map(o => {
+          const active = multi ? val.includes(o.v) : val === o.v;
+          return (
+            <button key={o.v} onClick={() => set(o.v)}
+              style={{ background: active ? C.black : C.bg, color: active ? C.white : C.muted, border: `1.5px solid ${active ? C.black : C.border}`, borderRadius: 20, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT.body, transition: "all 0.15s" }}>
+              {o.l}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -318,7 +322,7 @@ function UploadModal({ t, onClose }) {
             {/* Step 2 — Tags */}
             {step === 2 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <ChipRow label="Tipo de plan" opts={vibeOpts} val={vibe} set={setVibe} />
+                <ChipRow label="Tipo de plan (puedes elegir varios)" opts={vibeOpts} val={vibes} set={toggleVibe} multi />
                 <ChipRow label="Presupuesto por persona" opts={budgetOpts} val={budget} set={setBudget} />
                 <ChipRow label="Transporte" opts={[{ v: "yes", l: "Con coche 🚗" }, { v: "no", l: "Sin coche 🚇" }]} val={transport} set={setTransport} />
                 <div>
@@ -382,7 +386,7 @@ function UploadModal({ t, onClose }) {
                   {subtitle && <div style={{ fontSize: 13, color: C.muted, marginBottom: 8 }}>{subtitle}</div>}
                   <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>📍 {zone}</div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-                    {vibe && <span style={{ fontSize: 11, fontWeight: 700, color: C.tagGreen.text, background: C.tagGreen.bg, padding: "3px 9px", borderRadius: 20, textTransform: "uppercase" }}>{vibeOpts.find(o => o.v === vibe)?.l}</span>}
+                    {vibes.length > 0 && vibes.map(v => <span key={v} style={{ fontSize: 11, fontWeight: 700, color: C.tagGreen.text, background: C.tagGreen.bg, padding: "3px 9px", borderRadius: 20, textTransform: "uppercase" }}>{vibeOpts.find(o => o.v === v)?.l}</span>)}
                     {budget && <span style={{ fontSize: 11, fontWeight: 700, color: C.tagMuted.text, background: C.tagMuted.bg, padding: "3px 9px", borderRadius: 20, textTransform: "uppercase" }}>{budgetOpts.find(o => o.v === budget)?.l}</span>}
                     {transport && <span style={{ fontSize: 11, fontWeight: 700, color: C.tagAccent.text, background: C.tagAccent.bg, padding: "3px 9px", borderRadius: 20, textTransform: "uppercase" }}>{transport === "yes" ? "Con coche 🚗" : "Sin coche 🚇"}</span>}
                   </div>
@@ -971,10 +975,10 @@ function GeneratedPlan({ plan, answers, t, onBack, onRegen, go, error }) {
 }
 
 // ── Profile ───────────────────────────────────────────────────────────────────
-function ProfileScreen({ t, go, lang, setLang, onUpload, isLoggedIn, onLogin }) {
+function ProfileScreen({ t, go, lang, setLang, onUpload, isLoggedIn, onLogin, user, onLogout }) {
   if (!isLoggedIn) {
     return (
-      <div style={{ minHeight:"100vh", background:C.bg, paddingTop:52, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"80px 24px 40px" }}>
+      <div style={{ minHeight:"100vh", background:C.bg, paddingTop:52, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"52px 24px 40px" }}>
         <div style={{ fontSize:56, marginBottom:20 }}>👤</div>
         <h2 style={{ fontFamily:FONT.display, fontSize:22, fontWeight:900, color:C.black, marginBottom:10, textAlign:"center" }}>Crea tu cuenta</h2>
         <p style={{ fontSize:14, color:C.muted, textAlign:"center", marginBottom:32, lineHeight:1.6 }}>
@@ -990,15 +994,19 @@ function ProfileScreen({ t, go, lang, setLang, onUpload, isLoggedIn, onLogin }) 
     );
   }
 
+  const displayName = user?.name || user?.email?.split("@")[0] || "Usuario";
+  const initial = displayName[0]?.toUpperCase() || "U";
+
   return (
     <div style={{ minHeight:"100vh", background:C.bg, paddingTop:52, paddingBottom:40 }}>
       <div style={{ padding:"24px 16px" }}>
         <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
-          <div style={{ width:60, height:60, borderRadius:"50%", background:C.accent, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, fontWeight:900, color:C.accentText, fontFamily:FONT.display }}>👤</div>
-          <div>
-            <div style={{ fontFamily:FONT.display, fontSize:18, fontWeight:900, color:C.black }}>Mi perfil</div>
-            <div style={{ fontSize:13, color:C.muted }}>onlyplansco.com</div>
+          <div style={{ width:60, height:60, borderRadius:"50%", background:C.accent, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, fontWeight:900, color:C.accentText, fontFamily:FONT.display }}>{initial}</div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontFamily:FONT.display, fontSize:18, fontWeight:900, color:C.black }}>{displayName}</div>
+            <div style={{ fontSize:12, color:C.muted }}>{user?.email}</div>
           </div>
+          <button onClick={onLogout} style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:20, padding:"6px 14px", fontSize:12, color:C.muted, cursor:"pointer", fontFamily:FONT.body }}>Salir</button>
         </div>
 
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:24 }}>
@@ -1033,45 +1041,123 @@ function ProfileScreen({ t, go, lang, setLang, onUpload, isLoggedIn, onLogin }) 
 }
 
 // ── Auth Modal ────────────────────────────────────────────────────────────────
+const supabaseAuth = {
+  async signUp(email, password, name) {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, data: { full_name: name } }),
+    });
+    return r.json();
+  },
+  async signIn(email, password) {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    return r.json();
+  },
+  async getUser(token) {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` },
+    });
+    return r.json();
+  },
+  saveSession(data) {
+    try { localStorage.setItem("op_session", JSON.stringify({ token: data.access_token, email: data.user?.email, name: data.user?.user_metadata?.full_name || data.user?.email?.split("@")[0] })); } catch {}
+  },
+  loadSession() {
+    try { const s = localStorage.getItem("op_session"); return s ? JSON.parse(s) : null; } catch { return null; }
+  },
+  clearSession() {
+    try { localStorage.removeItem("op_session"); } catch {}
+  },
+};
+
 function AuthModal({ t, onClose, onSuccess }) {
   const [isLogin, setIsLogin] = useState(false);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [done, setDone] = useState(false);
 
-  const handleSubmit = () => {
-    if (!email.trim()) return;
-    setDone(true);
-    setTimeout(() => { onSuccess({ email, name: name || email.split("@")[0] }); onClose(); }, 1000);
+  const handleSubmit = async () => {
+    if (!email.trim() || !password.trim()) { setError("Rellena todos los campos"); return; }
+    if (!isLogin && password.length < 6) { setError("La contraseña debe tener al menos 6 caracteres"); return; }
+    setLoading(true);
+    setError("");
+    try {
+      let data;
+      if (isLogin) {
+        data = await supabaseAuth.signIn(email, password);
+      } else {
+        data = await supabaseAuth.signUp(email, password, name);
+      }
+      if (data.error || data.msg) {
+        setError(data.error_description || data.msg || "Ha ocurrido un error. Inténtalo de nuevo.");
+        setLoading(false);
+        return;
+      }
+      if (data.access_token) {
+        supabaseAuth.saveSession(data);
+        setDone(true);
+        setTimeout(() => {
+          onSuccess({ email: data.user?.email, name: data.user?.user_metadata?.full_name || data.user?.email?.split("@")[0], token: data.access_token });
+          onClose();
+        }, 800);
+      } else {
+        setError("Ha ocurrido un error. Inténtalo de nuevo.");
+        setLoading(false);
+      }
+    } catch {
+      setError("Error de conexión. Inténtalo de nuevo.");
+      setLoading(false);
+    }
   };
 
-  return (
-    <div style={{ position:"fixed", inset:0, background:C.overlay, zIndex:400, display:"flex", alignItems:"flex-end", justifyContent:"center" }} onClick={onClose}>
-      <div style={{ background:C.card, borderRadius:"20px 20px 0 0", padding:24, width:"100%", maxWidth:480 }} onClick={e=>e.stopPropagation()}>
-        <div style={{ width:36, height:4, background:C.border, borderRadius:2, margin:"0 auto 20px" }} />
-        <h2 style={{ fontFamily:FONT.display, fontSize:20, fontWeight:900, color:C.black, marginBottom:6 }}>
-          {isLogin ? "Iniciar sesión" : "Crear cuenta"}
-        </h2>
-        <p style={{ fontSize:13, color:C.muted, marginBottom:20 }}>Para guardar planes y subir los tuyos</p>
+  const inputStyle = { background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: "14px 16px", fontSize: 14, color: C.text, outline: "none", fontFamily: FONT.body, width: "100%", boxSizing: "border-box" };
 
-        {!done ? (
-          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-            {!isLogin && (
-              <input value={name} onChange={e=>setName(e.target.value)} placeholder="Tu nombre" style={{ background:C.bg, border:`1.5px solid ${C.border}`, borderRadius:12, padding:"14px 16px", fontSize:14, color:C.text, outline:"none", fontFamily:FONT.body }} />
-            )}
-            <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Tu email" type="email" style={{ background:C.bg, border:`1.5px solid ${email?C.accent:C.border}`, borderRadius:12, padding:"14px 16px", fontSize:14, color:C.text, outline:"none", fontFamily:FONT.body, transition:"border-color 0.2s" }} />
-            <Btn onClick={handleSubmit} variant="black" style={{ width:"100%", padding:"15px", fontSize:15, borderRadius:14 }}>
-              {isLogin ? "Entrar" : "Crear cuenta"}
-            </Btn>
-            <button onClick={()=>setIsLogin(!isLogin)} style={{ background:"transparent", border:"none", color:C.muted, fontSize:13, cursor:"pointer", fontFamily:FONT.body }}>
-              {isLogin ? "¿No tienes cuenta? Regístrate" : "¿Ya tienes cuenta? Inicia sesión"}
-            </button>
+  return (
+    <div style={{ position: "fixed", inset: 0, background: C.overlay, zIndex: 400, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={onClose}>
+      <div style={{ background: C.card, borderRadius: "20px 20px 0 0", padding: 24, width: "100%", maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+        <div style={{ width: 36, height: 4, background: C.border, borderRadius: 2, margin: "0 auto 20px" }} />
+
+        {done ? (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>✓</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: C.black, fontFamily: FONT.display }}>¡Bienvenido/a!</div>
           </div>
         ) : (
-          <div style={{ textAlign:"center", padding:"20px 0" }}>
-            <div style={{ fontSize:48, marginBottom:12 }}>✓</div>
-            <div style={{ fontSize:16, fontWeight:700, color:C.black }}>¡Bienvenido/a!</div>
-          </div>
+          <>
+            <h2 style={{ fontFamily: FONT.display, fontSize: 20, fontWeight: 900, color: C.black, marginBottom: 6 }}>
+              {isLogin ? "Iniciar sesión" : "Crear cuenta"}
+            </h2>
+            <p style={{ fontSize: 13, color: C.muted, marginBottom: 20 }}>Para guardar planes y subir los tuyos</p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {!isLogin && (
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="Tu nombre" style={inputStyle} />
+              )}
+              <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" style={{ ...inputStyle, border: `1.5px solid ${email ? C.accent : C.border}` }} />
+              <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña (mínimo 6 caracteres)" type="password" style={{ ...inputStyle, border: `1.5px solid ${password.length >= 6 ? C.accent : C.border}` }} />
+
+              {error && (
+                <div style={{ background: "#FEE2E2", border: "1px solid #FCA5A5", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#B91C1C" }}>
+                  {error}
+                </div>
+              )}
+
+              <Btn onClick={handleSubmit} variant="black" style={{ width: "100%", padding: "15px", fontSize: 15, borderRadius: 14, opacity: loading ? 0.7 : 1 }}>
+                {loading ? "..." : isLogin ? "Entrar" : "Crear cuenta"}
+              </Btn>
+              <button onClick={() => { setIsLogin(!isLogin); setError(""); }} style={{ background: "transparent", border: "none", color: C.muted, fontSize: 13, cursor: "pointer", fontFamily: FONT.body }}>
+                {isLogin ? "¿No tienes cuenta? Regístrate" : "¿Ya tienes cuenta? Inicia sesión"}
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -1092,13 +1178,23 @@ export default function App() {
   const [user, setUser] = useState(null);
   const t = LANGS[lang];
 
-  const go = s => { setScreen(s); window.scrollTo(0,0); };
+  // Restore session on load
+  useEffect(() => {
+    const session = supabaseAuth.loadSession();
+    if (session?.token) setUser(session);
+  }, []);
 
+  const go = s => { setScreen(s); window.scrollTo(0, 0); };
   const requireAuth = () => setShowAuth(true);
 
   const handleUpload = () => {
     if (!user) { setShowAuth(true); return; }
     setShowUpload(true);
+  };
+
+  const handleLogout = () => {
+    supabaseAuth.clearSession();
+    setUser(null);
   };
 
   const handleQuizComplete = async ans => {
@@ -1114,7 +1210,7 @@ export default function App() {
   };
 
   const handleRegen = async () => {
-    if(!answers){go("feed");return;}
+    if (!answers) { go("feed"); return; }
     go("loading");
     try {
       const p = await generatePlan(answers, timeData, lang);
@@ -1125,7 +1221,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ fontFamily:FONT.body, WebkitFontSmoothing:"antialiased", maxWidth:480, margin:"0 auto", background:C.bg, minHeight:"100vh" }}>
+    <div style={{ fontFamily: FONT.body, WebkitFontSmoothing: "antialiased", maxWidth: 480, margin: "0 auto", background: C.bg, minHeight: "100vh" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -1135,29 +1231,29 @@ export default function App() {
         @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
       `}</style>
 
-      {showUpload && <UploadModal t={t} onClose={()=>setShowUpload(false)}/>}
-      {showAuth && <AuthModal t={t} onClose={()=>setShowAuth(false)} onSuccess={u=>{ setUser(u); setShowAuth(false); }}/>}
+      {showUpload && <UploadModal t={t} onClose={() => setShowUpload(false)} />}
+      {showAuth && <AuthModal t={t} onClose={() => setShowAuth(false)} onSuccess={u => { setUser(u); setShowAuth(false); }} />}
 
-      {screen!=="loading" && (
-        <TopNav screen={screen} go={go} t={t} onCreatePlan={()=>go("time")} onUpload={handleUpload}/>
+      {screen !== "loading" && (
+        <TopNav screen={screen} go={go} t={t} onCreatePlan={() => go("time")} onUpload={handleUpload} />
       )}
 
-      {screen==="feed" && <FeedScreen t={t} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail");}} onUpload={handleUpload}/>}
-      {screen==="detail" && selectedPlan && <PlanDetail plan={selectedPlan} t={t} onBack={()=>go("feed")} onDoPlan={()=>go("time")} onRequireAuth={requireAuth} isLoggedIn={!!user}/>}
-      {screen==="time" && (
-        <div style={{ minHeight:"100vh", background:C.bg, paddingTop:52 }}>
-          <div style={{ padding:"20px 16px" }}>
-            <div style={{ fontSize:36, marginBottom:12 }}>📅</div>
-            <h2 style={{ fontFamily:FONT.display, fontSize:24, fontWeight:900, color:C.black, marginBottom:6, letterSpacing:-0.3 }}>{t.when}</h2>
-            <p style={{ fontSize:14, color:C.muted, marginBottom:22 }}>{t.whenSub}</p>
-            <TimeSelector t={t} onComplete={d=>{setTimeData(d);go("quiz");}}/>
+      {screen === "feed" && <FeedScreen t={t} go={go} onPlanClick={p => { setSelectedPlan(p); go("detail"); }} onUpload={handleUpload} />}
+      {screen === "detail" && selectedPlan && <PlanDetail plan={selectedPlan} t={t} onBack={() => go("feed")} onDoPlan={() => go("time")} onRequireAuth={requireAuth} isLoggedIn={!!user} />}
+      {screen === "time" && (
+        <div style={{ minHeight: "100vh", background: C.bg, paddingTop: 52 }}>
+          <div style={{ padding: "20px 16px" }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>📅</div>
+            <h2 style={{ fontFamily: FONT.display, fontSize: 24, fontWeight: 900, color: C.black, marginBottom: 6, letterSpacing: -0.3 }}>{t.when}</h2>
+            <p style={{ fontSize: 14, color: C.muted, marginBottom: 22 }}>{t.whenSub}</p>
+            <TimeSelector t={t} onComplete={d => { setTimeData(d); go("quiz"); }} />
           </div>
         </div>
       )}
-      {screen==="quiz" && <QuizScreen t={t} timeData={timeData} onComplete={handleQuizComplete} onBack={()=>go("time")}/>}
-      {screen==="loading" && <LoadingScreen t={t}/>}
-      {screen==="generated" && <GeneratedPlan plan={generatedPlan} answers={answers} t={t} onBack={()=>go("feed")} onRegen={handleRegen} go={go} error={planError}/>}
-      {screen==="profile" && <ProfileScreen t={t} go={go} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={()=>setShowAuth(true)}/>}
+      {screen === "quiz" && <QuizScreen t={t} timeData={timeData} onComplete={handleQuizComplete} onBack={() => go("time")} />}
+      {screen === "loading" && <LoadingScreen t={t} />}
+      {screen === "generated" && <GeneratedPlan plan={generatedPlan} answers={answers} t={t} onBack={() => go("feed")} onRegen={handleRegen} go={go} error={planError} />}
+      {screen === "profile" && <ProfileScreen t={t} go={go} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={() => setShowAuth(true)} user={user} onLogout={handleLogout} />}
     </div>
   );
 }
