@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 
-const ANTHROPIC_API_KEY = "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";
 const SUPABASE_URL = "https://ricrcrmabkcqkmqqbbcw.supabase.co";
 const SUPABASE_KEY = "sb_publishable_rrB-RExn7Kwi4k66MwZBew_2zMFWkoq";
 
@@ -144,19 +143,13 @@ const db = {
 
 // ── AI ────────────────────────────────────────────────────────────────────────
 async function generatePlan(answers, timeData, lang) {
-  const groups={pareja:"una pareja",amigos:"amigos",familia:"familia con niños",solo:"una persona sola"};
-  const vibes={naturaleza:"naturaleza",cultura:"cultura e historia",gastronomia:"gastronomía",tranquilidad:"tranquilidad",aventura:"aventura"};
-  const budgets={low:"<30€/persona",mid:"30-80€/persona",high:"sin límite"};
-  const hours=timeData?timeData.endHour-timeData.startHour:10;
-  const start=timeData?`${String(timeData.startHour).padStart(2,"0")}:00`:"09:00";
-  const prompt=`Eres OnlyPlans, el mejor planificador de fin de semana en España. Responde ${lang==="ca"?"en catalán":"en español"}.
-Genera un plan para: Salida: ${answers.location}, Grupo: ${groups[answers.group]}, Transporte: ${answers.transport==="yes"?"con coche":"sin coche"}, Presupuesto: ${budgets[answers.budget]}, Tipo: ${vibes[answers.vibe]}, Duración: ${hours}h desde las ${start}.
-Devuelve SOLO JSON: {"title":"...","subtitle":"...","zone":"zona · Xmin desde ${answers.location}","emoji":"emoji","stops":[{"time":"HH:MM","icon":"emoji","title":"...","desc":"descripción práctica con nombres reales","tag":"Viaje|Cultura|Naturaleza|Restaurante|Actividad","tagColor":"muted|green|orange|accent|purple"}],"tips":["..."]}
-5-7 paradas. Lugares reales de España. Primer stop=salida con aparcamiento. Último=vuelta.`;
-  const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":ANTHROPIC_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1500,messages:[{role:"user",content:prompt}]})});
-  if(!r.ok) throw new Error(`${r.status}`);
-  const data=await r.json();
-  return JSON.parse(data.content[0].text.replace(/```json|```/g,"").trim());
+  const r = await fetch("/api/generate-plan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answers, timeData, lang }),
+  });
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.json();
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
