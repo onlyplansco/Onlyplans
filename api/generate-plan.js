@@ -15,10 +15,20 @@ export default async function handler(req, res) {
   const start = timeData ? `${String(timeData.startHour).padStart(2, "0")}:00` : "09:00";
 
   const prompt = `Eres OnlyPlans, el mejor planificador de fin de semana en España. Responde ${lang === "ca" ? "en catalán" : "en español"}.
-Genera un plan para: Salida: ${answers.location}, Grupo: ${groups[answers.group]}, Transporte: ${answers.transport === "yes" ? "con coche" : "sin coche"}, Presupuesto: ${budgets[answers.budget]}, Tipo: ${vibes[answers.vibe]}, Duración: ${hours}h desde las ${start}.
+
+Genera un plan para una persona que sale desde: ${answers.location}
+- Grupo: ${groups[answers.group]}
+- Transporte: ${answers.transport === "yes" ? "con coche propio" : "sin coche, solo transporte público"}
+- Presupuesto: ${budgets[answers.budget]}
+- Tipo de plan: ${vibes[answers.vibe]}
+- Duración: ${hours}h empezando a las ${start}
+
+IMPORTANTE: La persona sale desde ${answers.location}. Calcula distancias y tiempos de viaje desde ${answers.location}, NO desde Barcelona. La última parada siempre es la vuelta a ${answers.location}.
+
 Devuelve SOLO JSON sin texto extra:
-{"title":"...","subtitle":"...","zone":"zona · Xmin desde ${answers.location}","emoji":"emoji","stops":[{"time":"HH:MM","icon":"emoji","title":"...","desc":"descripción práctica con nombres reales","tag":"Viaje|Cultura|Naturaleza|Restaurante|Actividad","tagColor":"muted|green|orange|accent|purple"}],"tips":["..."]}
-5-7 paradas. Lugares reales de España. Primer stop=salida con aparcamiento o transporte. Último=vuelta a casa.`;
+{"title":"...","subtitle":"...","zone":"zona · Xmin desde ${answers.location}","emoji":"emoji","stops":[{"time":"HH:MM","icon":"emoji","title":"...","desc":"descripción práctica con nombres reales de España","tag":"Viaje|Cultura|Naturaleza|Restaurante|Actividad","tagColor":"muted|green|orange|accent|purple"}],"tips":["..."]}
+
+5-7 paradas. Primer stop = salida desde ${answers.location} con info de aparcamiento o transporte. Último stop = vuelta a ${answers.location}.`;
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
