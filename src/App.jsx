@@ -1107,7 +1107,7 @@ function ProfileScreen({ t, go, lang, setLang, onUpload, isLoggedIn, onLogin, us
         </div>
 
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:24 }}>
-          {[{n:"0",l:t.generatedLbl},{n:"0",l:t.savedPlans},{n:"0",l:t.myPlans}].map((s,i)=>(
+          {[{n:"0",l:t.generatedLbl},{n:String(savedPlans.length),l:t.savedPlans},{n:"0",l:t.myPlans}].map((s,i)=>(
             <div key={i} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:"14px 8px", textAlign:"center" }}>
               <div style={{ fontFamily:FONT.display, fontSize:26, fontWeight:900, color:C.accent }}>{s.n}</div>
               <div style={{ fontSize:11, color:C.muted, lineHeight:1.3, marginTop:4 }}>{s.l}</div>
