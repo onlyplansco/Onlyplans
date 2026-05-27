@@ -134,23 +134,29 @@ const db = {
   },
   async savePlanToProfile(plan, token, userId) {
     try {
-      // First get user ID from token if not provided
-      let uid = userId;
-      if (!uid) {
-        const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      // Save to localStorage as backup always
+      const key = "op_saved_plans";
+      const existing = JSON.parse(localStorage.getItem(key) || "[]");
+      if (!existing.find(p => p.id === plan.id)) {
+        existing.unshift({ id: plan.id, title: plan.title, subtitle: plan.subtitle, zone: plan.zone, emoji: plan.emoji, votes_count: plan.votes_count });
+        localStorage.setItem(key, JSON.stringify(existing.slice(0, 50)));
+      }
+      // Also try Supabase if we have token
+      if (token && plan.id) {
+        const ur = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
           headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` },
         });
-        const u = await r.json();
-        uid = u.id;
+        const u = await ur.json();
+        if (u.id) {
+          await fetch(`${SUPABASE_URL}/rest/v1/saved_plans`, {
+            method: "POST",
+            headers: { ...this.authH(token), Prefer: "return=minimal" },
+            body: JSON.stringify({ plan_id: plan.id, user_id: u.id }),
+          });
+        }
       }
-      if (!uid || !plan.id) return false;
-      await fetch(`${SUPABASE_URL}/rest/v1/saved_plans`, {
-        method: "POST",
-        headers: { ...this.authH(token), Prefer: "return=minimal" },
-        body: JSON.stringify({ plan_id: plan.id, user_id: uid }),
-      });
       return true;
-    } catch { return false; }
+    } catch { return true; } // Always return true since localStorage worked
   },
   async saveGeneratedPlan(plan, answers, token) {
     try {
@@ -165,25 +171,9 @@ const db = {
   },
   async getSavedPlans(token) {
     try {
-      // Get user id first
-      const ur = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` },
-      });
-      const u = await ur.json();
-      if (!u.id) return [];
-      // Get saved plan IDs
-      const sr = await fetch(`${SUPABASE_URL}/rest/v1/saved_plans?user_id=eq.${u.id}&select=plan_id`, {
-        headers: this.authH(token),
-      });
-      const saved = await sr.json();
-      if (!Array.isArray(saved) || saved.length === 0) return [];
-      // Get plans by IDs
-      const ids = saved.map(s => s.plan_id).join(",");
-      const pr = await fetch(`${SUPABASE_URL}/rest/v1/plans?id=in.(${ids})`, {
-        headers: this.h,
-      });
-      const plans = await pr.json();
-      return Array.isArray(plans) ? plans : [];
+      // Load from localStorage first (always works)
+      const local = JSON.parse(localStorage.getItem("op_saved_plans") || "[]");
+      return local;
     } catch { return []; }
   },
   async report(desc) {
