@@ -132,12 +132,22 @@ const db = {
     try { await fetch(`${SUPABASE_URL}/rest/v1/plans`,{method:"POST",headers:this.h,body:JSON.stringify({...data,is_approved:true,votes_count:0})}); return true; }
     catch { return false; }
   },
-  async savePlanToProfile(plan, token) {
+  async savePlanToProfile(plan, token, userId) {
     try {
+      // First get user ID from token if not provided
+      let uid = userId;
+      if (!uid) {
+        const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` },
+        });
+        const u = await r.json();
+        uid = u.id;
+      }
+      if (!uid || !plan.id) return false;
       await fetch(`${SUPABASE_URL}/rest/v1/saved_plans`, {
         method: "POST",
-        headers: this.authH(token),
-        body: JSON.stringify({ plan_id: plan.id }),
+        headers: { ...this.authH(token), Prefer: "return=minimal" },
+        body: JSON.stringify({ plan_id: plan.id, user_id: uid }),
       });
       return true;
     } catch { return false; }
@@ -155,11 +165,25 @@ const db = {
   },
   async getSavedPlans(token) {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/saved_plans?select=plan_id,plans(*)&order=created_at.desc`, {
+      // Get user id first
+      const ur = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` },
+      });
+      const u = await ur.json();
+      if (!u.id) return [];
+      // Get saved plan IDs
+      const sr = await fetch(`${SUPABASE_URL}/rest/v1/saved_plans?user_id=eq.${u.id}&select=plan_id`, {
         headers: this.authH(token),
       });
-      const d = await r.json();
-      return Array.isArray(d) ? d.map(x => x.plans).filter(Boolean) : [];
+      const saved = await sr.json();
+      if (!Array.isArray(saved) || saved.length === 0) return [];
+      // Get plans by IDs
+      const ids = saved.map(s => s.plan_id).join(",");
+      const pr = await fetch(`${SUPABASE_URL}/rest/v1/plans?id=in.(${ids})`, {
+        headers: this.h,
+      });
+      const plans = await pr.json();
+      return Array.isArray(plans) ? plans : [];
     } catch { return []; }
   },
   async report(desc) {
