@@ -237,6 +237,18 @@ const db = {
     } catch {}
   },
 
+  saveMyPlanLocal(plan) {
+    try {
+      const existing = JSON.parse(localStorage.getItem("op_my_plans") || "[]");
+      existing.unshift({id:plan.id||`my-${Date.now()}`, title:plan.title, subtitle:plan.subtitle, zone:plan.zone, emoji:plan.emoji, img:plan.img||null, votes_count:0});
+      localStorage.setItem("op_my_plans", JSON.stringify(existing.slice(0,50)));
+    } catch {}
+  },
+
+  getMyPlansLocal() {
+    try { return JSON.parse(localStorage.getItem("op_my_plans") || "[]"); } catch { return []; }
+  },
+
   async updateProfile(userId, data, token) {
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
@@ -299,7 +311,9 @@ function Btn({children,onClick,variant="black",style={}}) {
 // ── Photo Carousel ────────────────────────────────────────────────────────────
 function PhotoCarousel({photos, fallback, height=220}) {
   const [idx, setIdx] = useState(0);
-  const imgs = photos && photos.length > 0 ? photos : [fallback].filter(Boolean);
+  // Normalize: filter out null/empty values
+  const photoList = Array.isArray(photos) ? photos.filter(Boolean) : [];
+  const imgs = photoList.length > 0 ? photoList : (fallback ? [fallback] : []);
   if (!imgs.length) return <div style={{height,background:`linear-gradient(135deg,${C.accent}30,${C.accent}10)`}}/>;
 
   return (
@@ -392,18 +406,29 @@ function FeedCard({plan, t, onClick, user, onRequireAuth}) {
 
 // ── Filters Panel ─────────────────────────────────────────────────────────────
 function FiltersPanel({t, onClose, onApply, activeFilters}) {
+  const [cat, setCat] = useState(activeFilters.cat||null);
   const [dist, setDist] = useState(activeFilters.dist||null);
   const [dur, setDur] = useState(activeFilters.dur||null);
   const [budget, setBudget] = useState(activeFilters.budget||null);
   const [transport, setTransport] = useState(activeFilters.transport||null);
   const [group, setGroup] = useState(activeFilters.group||null);
   const [userLocation, setUserLocation] = useState(null);
+  const [locationError, setLocationError] = useState(null);
 
   const requestLocation = () => {
-    navigator.geolocation?.getCurrentPosition(pos=>setUserLocation({lat:pos.coords.latitude,lng:pos.coords.longitude}),()=>{});
+    setLocationError(null);
+    if (!navigator.geolocation) { setLocationError("Tu navegador no soporta geolocalización"); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => setUserLocation({lat:pos.coords.latitude, lng:pos.coords.longitude}),
+      (err) => {
+        if (err.code === 1) setLocationError("Permiso denegado. Actívalo en ajustes del navegador.");
+        else setLocationError("No se pudo obtener la ubicación. Inténtalo de nuevo.");
+      },
+      { timeout: 10000, enableHighAccuracy: false }
+    );
   };
 
-  const hasActive = dist||dur||budget||transport||group;
+  const hasActive = cat||dist||dur||budget||transport||group;
 
   const Row = ({label,opts,val,set}) => (
     <div style={{marginBottom:18}}>
@@ -416,21 +441,35 @@ function FiltersPanel({t, onClose, onApply, activeFilters}) {
     </div>
   );
 
+  const sheetRef = useRef();
+  const touchStartY = useRef(0);
+
+  const handleTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
+  const handleTouchEnd = (e) => {
+    const diff = e.changedTouches[0].clientY - touchStartY.current;
+    if (diff > 80) onClose();
+  };
+
   return (
     <div style={{position:"fixed",inset:0,background:C.overlay,zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div style={{background:C.card,borderRadius:"20px 20px 0 0",padding:24,width:"100%",maxWidth:480,maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <div ref={sheetRef} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} style={{background:C.card,borderRadius:"20px 20px 0 0",padding:24,width:"100%",maxWidth:480,maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
         <div style={{width:36,height:4,background:C.border,borderRadius:2,margin:"0 auto 20px"}}/>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
           <span style={{fontFamily:F,fontSize:18,fontWeight:800,color:C.black}}>{t.filters}</span>
-          <button onClick={()=>{setDist(null);setDur(null);setBudget(null);setTransport(null);setGroup(null);}} style={{background:"transparent",border:"none",fontSize:13,color:hasActive?C.black:C.dim,cursor:"pointer",fontFamily:F,fontWeight:hasActive?700:400}}>{t.clearFilters}</button>
+          <button onClick={()=>{setCat(null);setDist(null);setDur(null);setBudget(null);setTransport(null);setGroup(null);}} style={{background:"transparent",border:"none",fontSize:13,color:hasActive?C.black:C.dim,cursor:"pointer",fontFamily:F,fontWeight:hasActive?700:400}}>{t.clearFilters}</button>
         </div>
+
+        <Row label="Categoría" opts={t.cats} val={cat} set={setCat}/>
 
         <div style={{marginBottom:18}}>
           <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:0.6,marginBottom:8}}>{t.distanceFilter}</div>
           {!userLocation ? (
-            <div style={{background:C.accent+"20",border:`1px solid ${C.accent}`,borderRadius:12,padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:13,color:C.accentText}}>{t.locationNeeded}</span>
-              <button onClick={requestLocation} style={{background:C.accent,border:"none",borderRadius:10,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",color:C.accentText,fontFamily:F}}>{t.allowLocation}</button>
+            <div>
+              <div style={{background:C.accent+"20",border:`1px solid ${C.accent}`,borderRadius:12,padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:13,color:C.accentText}}>{t.locationNeeded}</span>
+                <button onClick={requestLocation} style={{background:C.accent,border:"none",borderRadius:10,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",color:C.accentText,fontFamily:F}}>{t.allowLocation}</button>
+              </div>
+              {locationError && <div style={{fontSize:12,color:"#B91C1C",marginTop:8,padding:"6px 10px",background:"#FEE2E2",borderRadius:8}}>{locationError}</div>}
             </div>
           ) : (
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -444,8 +483,8 @@ function FiltersPanel({t, onClose, onApply, activeFilters}) {
         <Row label={t.transportFilter} opts={t.transportOpts} val={transport} set={setTransport}/>
         <Row label={t.groupFilter} opts={t.groupOpts} val={group} set={setGroup}/>
 
-        <Btn onClick={()=>{onApply({dist,dur,budget,transport,group});onClose();}} variant="black" style={{width:"100%",padding:"15px",borderRadius:14,marginTop:4}}>
-          {t.applyFilters} {hasActive?`(${[dist,dur,budget,transport,group].filter(Boolean).length})`:""}
+        <Btn onClick={()=>{onApply({cat,dist,dur,budget,transport,group});onClose();}} variant="black" style={{width:"100%",padding:"15px",borderRadius:14,marginTop:4}}>
+          {t.applyFilters} {hasActive?`(${[cat,dist,dur,budget,transport,group].filter(Boolean).length})`:""}
         </Btn>
       </div>
     </div>
@@ -483,6 +522,11 @@ function FeedScreen({t, go, onPlanClick, onUpload, user, onRequireAuth}) {
 
   const applyFilters = (f) => {
     setActiveFilters(f);
+    // If category was set in advanced filters, also update the quick filter bar
+    if (f.cat) {
+      setFilter(f.cat);
+      load(f.cat, sortRandom);
+    }
   };
 
   return (
@@ -639,7 +683,7 @@ function PlanDetail({plan, t, onBack, user, onRequireAuth, go}) {
 }
 
 // ── Upload Modal ──────────────────────────────────────────────────────────────
-function UploadModal({t, onClose, user}) {
+function UploadModal({t, onClose, user, onUploaded}) {
   const STEPS = 5;
   const [step, setStep] = useState(1);
   const [done, setDone] = useState(false);
@@ -690,9 +734,12 @@ function UploadModal({t, onClose, user}) {
       author_id: user?.id||null,
       author_name: user?.name||null,
     };
-    await db.submitPlan(planData);
+    const result = await db.submitPlan(planData);
+    // Save to myPlans locally regardless of Supabase result
+    db.saveMyPlanLocal({...planData, id: result?.id || `my-${Date.now()}`});
     setUploading(false);
     setDone(true);
+    if (onUploaded) onUploaded();
   };
 
   const inp = (val) => ({background:C.bg,border:`1.5px solid ${val?C.accent:C.border}`,borderRadius:12,padding:"12px 14px",fontSize:14,color:C.text,outline:"none",fontFamily:F,width:"100%",transition:"border-color 0.2s",boxSizing:"border-box"});
@@ -1158,14 +1205,24 @@ function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error}) {
 }
 
 // ── Profile Screen ────────────────────────────────────────────────────────────
-function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, onLogout, go}) {
+function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, onLogout, go, onPlanClick}) {
   const [savedPlans, setSavedPlans] = useState([]);
+  const [myPlans, setMyPlans] = useState([]);
   const [editMode, setEditMode] = useState(false);
-  const [bio, setBio] = useState(user?.bio||"");
-  const [avatar, setAvatar] = useState(user?.avatar||null);
+  const [bio, setBio] = useState("");
+  const [avatar, setAvatar] = useState(null);
   const avatarRef = useRef();
 
-  useEffect(()=>{ setSavedPlans(db.getSavedLocal()); },[]);
+  useEffect(()=>{
+    setSavedPlans(db.getSavedLocal());
+    setMyPlans(db.getMyPlansLocal());
+    // Load persisted bio/avatar
+    try {
+      const profile = JSON.parse(localStorage.getItem("op_profile") || "{}");
+      if (profile.bio) setBio(profile.bio);
+      if (profile.avatar) setAvatar(profile.avatar);
+    } catch {}
+  },[]);
 
   if (!isLoggedIn) return (
     <div style={{minHeight:"100vh",background:C.bg,paddingTop:52,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"52px 24px 40px"}}>
@@ -1180,7 +1237,7 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
   const initial = (user?.name||user?.email||"U")[0].toUpperCase();
 
   return (
-    <div style={{minHeight:"100vh",background:C.bg,paddingTop:52,paddingBottom:40}}>
+    <div style={{minHeight:"100vh",background:C.bg,paddingTop:52,paddingBottom:40,overscrollBehaviorY:"contain"}}>
       <div style={{padding:"24px 16px"}}>
         <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20}}>
           <div onClick={()=>editMode&&avatarRef.current.click()} style={{width:64,height:64,borderRadius:"50%",background:C.accent,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,fontWeight:900,color:C.accentText,fontFamily:F,cursor:editMode?"pointer":"default",overflow:"hidden",flexShrink:0,position:"relative"}}>
@@ -1193,7 +1250,15 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
             <div style={{fontSize:12,color:C.muted}}>{user?.email}</div>
           </div>
           <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>setEditMode(!editMode)} style={{background:editMode?C.accent:"transparent",border:`1px solid ${editMode?C.accent:C.border}`,borderRadius:20,padding:"6px 14px",fontSize:12,color:editMode?C.accentText:C.muted,cursor:"pointer",fontFamily:F,fontWeight:editMode?700:400}}>{editMode?t.saveProfile:t.editProfile}</button>
+            <button onClick={()=>{
+              if (editMode) {
+                // Save profile
+                try {
+                  localStorage.setItem("op_profile", JSON.stringify({bio, avatar}));
+                } catch {}
+              }
+              setEditMode(!editMode);
+            }} style={{background:editMode?C.accent:"transparent",border:`1px solid ${editMode?C.accent:C.border}`,borderRadius:20,padding:"6px 14px",fontSize:12,color:editMode?C.accentText:C.muted,cursor:"pointer",fontFamily:F,fontWeight:editMode?700:400}}>{editMode?t.saveProfile:t.editProfile}</button>
             <button onClick={onLogout} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:20,padding:"6px 14px",fontSize:12,color:C.muted,cursor:"pointer",fontFamily:F}}>{t.logout}</button>
           </div>
         </div>
@@ -1212,7 +1277,7 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
         )}
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:20}}>
-          {[{n:"0",l:t.generatedLbl},{n:String(savedPlans.length),l:t.savedPlans},{n:"0",l:t.myPlans}].map((s,i)=>(
+          {[{n:"0",l:t.generatedLbl},{n:String(savedPlans.length),l:t.savedPlans},{n:String(myPlans.length),l:t.myPlans}].map((s,i)=>(
             <div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:"14px 8px",textAlign:"center"}}>
               <div style={{fontFamily:F,fontSize:26,fontWeight:900,color:C.accent}}>{s.n}</div>
               <div style={{fontSize:11,color:C.muted,lineHeight:1.3,marginTop:4}}>{s.l}</div>
@@ -1229,7 +1294,7 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
           {savedPlans.length>0?(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {savedPlans.map((p,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0",borderBottom:i<savedPlans.length-1?`1px solid ${C.border}`:"none"}}>
+                <div key={i} onClick={()=>onPlanClick&&onPlanClick(p)} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0",borderBottom:i<savedPlans.length-1?`1px solid ${C.border}`:"none",cursor:"pointer"}}>
                   {p.img?<img src={p.img} style={{width:48,height:48,borderRadius:10,objectFit:"cover",flexShrink:0}} alt="" onError={e=>e.target.style.display="none"}/>:<span style={{fontSize:28,flexShrink:0}}>{p.emoji||"🗺️"}</span>}
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:700,color:C.black,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.title}</div>
@@ -1260,6 +1325,53 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
   );
 }
 
+// ── User Profile Screen ───────────────────────────────────────────────────────
+function UserProfileScreen({userId, userName, t, onBack}) {
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const initial = (userName||"U")[0].toUpperCase();
+
+  useEffect(()=>{
+    if (!userId) { setLoading(false); return; }
+    fetch(`${SUPABASE_URL}/rest/v1/plans?author_id=eq.${userId}&is_approved=eq.true&order=votes_count.desc`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    }).then(r=>r.json()).then(d=>{ setPlans(Array.isArray(d)?d:[]); setLoading(false); }).catch(()=>setLoading(false));
+  },[userId]);
+
+  return (
+    <div style={{minHeight:"100vh",background:C.bg,paddingTop:52,paddingBottom:40}}>
+      <div style={{padding:"20px 16px"}}>
+        <button onClick={onBack} style={{background:"transparent",border:"none",color:C.muted,cursor:"pointer",fontSize:14,fontFamily:F,marginBottom:20}}>← Volver</button>
+        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:24}}>
+          <div style={{width:64,height:64,borderRadius:"50%",background:C.accent,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,fontWeight:900,color:C.accentText,fontFamily:F}}>{initial}</div>
+          <div>
+            <div style={{fontFamily:F,fontSize:18,fontWeight:900,color:C.black}}>{userName||"Usuario"}</div>
+            <div style={{fontSize:12,color:C.muted}}>{plans.length} plan{plans.length!==1?"es":""} publicado{plans.length!==1?"s":""}</div>
+          </div>
+        </div>
+        <h2 style={{fontFamily:F,fontSize:16,fontWeight:800,color:C.black,marginBottom:16}}>{t.plansByUser} {userName}</h2>
+        {loading ? (
+          <div style={{textAlign:"center",padding:40,color:C.muted}}>Cargando...</div>
+        ) : plans.length === 0 ? (
+          <div style={{textAlign:"center",padding:40,color:C.muted}}>Este usuario aún no ha publicado planes.</div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {plans.map(p=>(
+              <div key={p.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden"}}>
+                {p.img&&<img src={p.img} alt="" style={{width:"100%",height:140,objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>}
+                <div style={{padding:14}}>
+                  <div style={{fontSize:15,fontWeight:800,color:C.black,fontFamily:F,marginBottom:4}}>{p.title}</div>
+                  <div style={{fontSize:12,color:C.muted}}>📍 {p.zone}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen] = useState("feed");
@@ -1273,6 +1385,7 @@ export default function App() {
   const [showUpload, setShowUpload] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [user, setUser] = useState(null);
+  const [feedKey, setFeedKey] = useState(0); // force feed reload
   const t = T[lang];
 
   // Persist lang
@@ -1285,17 +1398,21 @@ export default function App() {
   const requireAuth = () => setShowAuth(true);
   const handleUpload = () => { if(!user){setShowAuth(true);return;} setShowUpload(true); };
   const handleLogout = () => { auth.clear(); setUser(null); };
+  const handleUploaded = () => { setFeedKey(k=>k+1); }; // reload feed after upload
 
   const handleQuizComplete = async (ans) => {
     setAnswers(ans);
     go("loading");
     try {
-      const p = await fetch("/api/generate-plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({answers:ans,timeData,lang})});
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const p = await fetch("/api/generate-plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({answers:ans,timeData,lang}),signal:controller.signal});
+      clearTimeout(timeout);
       if (!p.ok) throw new Error(`${p.status}`);
       const plan = await p.json();
       setGeneratedPlan(plan); setPlanError(null); go("generated");
     } catch(e) {
-      setPlanError("No hemos podido generar el plan. Comprueba tu conexión e inténtalo de nuevo.");
+      setPlanError(e.name==="AbortError"?"El plan tardó demasiado. Inténtalo de nuevo.":"No hemos podido generar el plan. Comprueba tu conexión e inténtalo de nuevo.");
       go("generated");
     }
   };
@@ -1304,11 +1421,14 @@ export default function App() {
     if(!answers){go("feed");return;}
     go("loading");
     try {
-      const p = await fetch("/api/generate-plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({answers,timeData,lang})});
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const p = await fetch("/api/generate-plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({answers,timeData,lang}),signal:controller.signal});
+      clearTimeout(timeout);
       if(!p.ok) throw new Error(`${p.status}`);
       const plan = await p.json();
       setGeneratedPlan(plan); setPlanError(null); go("generated");
-    } catch { setPlanError("No hemos podido regenerar el plan."); go("generated"); }
+    } catch(e) { setPlanError(e.name==="AbortError"?"El plan tardó demasiado. Inténtalo de nuevo.":"No hemos podido regenerar el plan."); go("generated"); }
   };
 
   return (
@@ -1322,13 +1442,14 @@ export default function App() {
         @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
       `}</style>
 
-      {showUpload&&<UploadModal t={t} onClose={()=>setShowUpload(false)} user={user}/>}
+      {showUpload&&<UploadModal t={t} onClose={()=>setShowUpload(false)} user={user} onUploaded={handleUploaded}/>}
       {showAuth&&<AuthModal t={t} onClose={()=>setShowAuth(false)} onSuccess={u=>{setUser(u);setShowAuth(false);}}/>}
 
       {screen!=="loading"&&<TopNav screen={screen} go={go} t={t} user={user} onCreatePlan={()=>go("time")} onUpload={handleUpload}/>}
 
-      {screen==="feed"&&<FeedScreen t={t} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail");}} onUpload={handleUpload} user={user} onRequireAuth={requireAuth}/>}
+      {screen==="feed"&&<FeedScreen key={feedKey} t={t} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail");}} onUpload={handleUpload} user={user} onRequireAuth={requireAuth}/>}
       {screen==="detail"&&selectedPlan&&<PlanDetail plan={selectedPlan} t={t} onBack={()=>go("feed")} user={user} onRequireAuth={requireAuth} go={go}/>}
+      {screen==="userProfile"&&<UserProfileScreen userId={screenParams.userId} userName={screenParams.userName} t={t} onBack={()=>go("feed")}/>}
       {screen==="time"&&(
         <div style={{minHeight:"100vh",background:C.bg,paddingTop:52}}>
           <div style={{padding:"20px 16px"}}>
@@ -1342,7 +1463,7 @@ export default function App() {
       {screen==="quiz"&&<QuizScreen t={t} timeData={timeData} onComplete={handleQuizComplete} onBack={()=>go("time")}/>}
       {screen==="loading"&&<LoadingScreen t={t}/>}
       {screen==="generated"&&<GeneratedPlan plan={generatedPlan} answers={answers} t={t} onBack={()=>go("feed")} onRegen={handleRegen} go={go} error={planError}/>}
-      {screen==="profile"&&<ProfileScreen t={t} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={()=>setShowAuth(true)} user={user} onLogout={handleLogout} go={go}/>}
+      {screen==="profile"&&<ProfileScreen t={t} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={()=>setShowAuth(true)} user={user} onLogout={handleLogout} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail");}}/> }
     </div>
   );
 }
