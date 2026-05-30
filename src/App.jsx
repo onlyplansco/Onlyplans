@@ -150,8 +150,8 @@ const T = {
 
 // ── Mock plans ────────────────────────────────────────────────────────────────
 const MOCK = [
-  { id:"m1", emoji:"⛰️", title:"Amanecer en Montserrat + Viñedos Penedès", subtitle:"Montaña sagrada, vistas únicas y vino de la tierra", zone:"Barcelona · 1h", vibe:"naturaleza", budget:"mid", transport:"yes", votes_count:412, duration:"Día completo", img:"https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80", photos:[], stops:[{time:"08:00",icon:"🚗",title:"Salida hacia Montserrat",desc:"A-2 dirección Martorell. Aparcamiento en la base del teleférico.",tag:"Viaje",tagColor:"muted"},{time:"09:30",icon:"⛰️",title:"Montserrat",desc:"Sube en teleférico. Visita la Moreneta y haz la ruta Sant Joan. Vistas espectaculares.",tag:"Naturaleza",tagColor:"green"},{time:"13:00",icon:"🍷",title:"Bodega Torres",desc:"Visita guiada con cata incluida. Reserva previa. ~25€/persona.",tag:"Gastronomía",tagColor:"orange"},{time:"15:30",icon:"🌿",title:"Viñedos del Penedès",desc:"Paseo entre viñas. Paisaje precioso en primavera y otoño.",tag:"Naturaleza",tagColor:"green"},{time:"18:00",icon:"🏠",title:"Vuelta a casa",desc:"Por la AP-7. Llegarás antes de las 19:30.",tag:"Viaje",tagColor:"muted"}], tips:["Reserva el teleférico online para evitar colas","La Bodega Torres necesita reserva con antelación"] },
-  { id:"m2", emoji:"🏰", title:"Besalú Medieval + Volcanes de la Garrotxa", subtitle:"Puente románico del s.XII y paisaje volcánico único", zone:"Girona · 1h 30min", vibe:"cultura", budget:"mid", transport:"yes", votes_count:347, duration:"Día completo", img:"https://images.unsplash.com/photo-1555993539-1732b0258235?w=800&q=80", photos:[], stops:[{time:"08:30",icon:"🚗",title:"Salida hacia Besalú",desc:"C-17 y N-260. Aparcamiento junto al río Fluvià.",tag:"Viaje",tagColor:"muted"},{time:"10:00",icon:"🏰",title:"Besalú",desc:"Cruza el puente románico del s.XII. Visita el barrio judío y la iglesia de Sant Pere.",tag:"Cultura",tagColor:"accent"},{time:"12:30",icon:"🌋",title:"Volcà del Croscat",desc:"El volcán más joven de la Península. Ruta de 3km muy sencilla.",tag:"Naturaleza",tagColor:"green"},{time:"14:30",icon:"🍽️",title:"Can Jubany",desc:"Restaurante de referencia. Cocina catalana de autor. Reserva imprescindible.",tag:"Restaurante",tagColor:"orange"},{time:"17:00",icon:"🌲",title:"Fageda d'en Jordà",desc:"El hayedo más bonito de Cataluña. 45 min entre hayas centenarias.",tag:"Naturaleza",tagColor:"green"}], tips:["Mejor en otoño para los colores del hayedo","Can Jubany: reserva con semanas de antelación"] },
+  { id:"m1", emoji:"⛰️", title:"Amanecer en Montserrat + Viñedos Penedès", subtitle:"Montaña sagrada, vistas únicas y vino de la tierra", zone:"Barcelona · 1h", vibe:"naturaleza", budget:"mid", transport:"yes", votes_count:412, duration:"Día completo", img:"https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80", photos:["https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80","https://images.unsplash.com/photo-1474524955719-b9f87c50ce47?w=800&q=80","https://images.unsplash.com/photo-1510797215324-95aa89f43c33?w=800&q=80"], stops:[{time:"08:00",icon:"🚗",title:"Salida hacia Montserrat",desc:"A-2 dirección Martorell. Aparcamiento en la base del teleférico.",tag:"Viaje",tagColor:"muted"},{time:"09:30",icon:"⛰️",title:"Montserrat",desc:"Sube en teleférico. Visita la Moreneta y haz la ruta Sant Joan. Vistas espectaculares.",tag:"Naturaleza",tagColor:"green"},{time:"13:00",icon:"🍷",title:"Bodega Torres",desc:"Visita guiada con cata incluida. Reserva previa. ~25€/persona.",tag:"Gastronomía",tagColor:"orange"},{time:"15:30",icon:"🌿",title:"Viñedos del Penedès",desc:"Paseo entre viñas. Paisaje precioso en primavera y otoño.",tag:"Naturaleza",tagColor:"green"},{time:"18:00",icon:"🏠",title:"Vuelta a casa",desc:"Por la AP-7. Llegarás antes de las 19:30.",tag:"Viaje",tagColor:"muted"}], tips:["Reserva el teleférico online para evitar colas","La Bodega Torres necesita reserva con antelación"] },
+  { id:"m2", emoji:"🏰", title:"Besalú Medieval + Volcanes de la Garrotxa", subtitle:"Puente románico del s.XII y paisaje volcánico único", zone:"Girona · 1h 30min", vibe:"cultura", budget:"mid", transport:"yes", votes_count:347, duration:"Día completo", img:"https://images.unsplash.com/photo-1555993539-1732b0258235?w=800&q=80", photos:["https://images.unsplash.com/photo-1555993539-1732b0258235?w=800&q=80","https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80"], stops:[{time:"08:30",icon:"🚗",title:"Salida hacia Besalú",desc:"C-17 y N-260. Aparcamiento junto al río Fluvià.",tag:"Viaje",tagColor:"muted"},{time:"10:00",icon:"🏰",title:"Besalú",desc:"Cruza el puente románico del s.XII. Visita el barrio judío y la iglesia de Sant Pere.",tag:"Cultura",tagColor:"accent"},{time:"12:30",icon:"🌋",title:"Volcà del Croscat",desc:"El volcán más joven de la Península. Ruta de 3km muy sencilla.",tag:"Naturaleza",tagColor:"green"},{time:"14:30",icon:"🍽️",title:"Can Jubany",desc:"Restaurante de referencia. Cocina catalana de autor. Reserva imprescindible.",tag:"Restaurante",tagColor:"orange"},{time:"17:00",icon:"🌲",title:"Fageda d'en Jordà",desc:"El hayedo más bonito de Cataluña. 45 min entre hayas centenarias.",tag:"Naturaleza",tagColor:"green"}], tips:["Mejor en otoño para los colores del hayedo","Can Jubany: reserva con semanas de antelación"] },
   { id:"m3", emoji:"🏙️", title:"Barrio Gótico + Santa Caterina + Barceloneta", subtitle:"Lo mejor de Barcelona en un día sin agobios", zone:"Barcelona · Ciudad", vibe:"cultura", budget:"low", transport:"no", votes_count:289, duration:"Día completo", img:"https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=800&q=80", photos:[], stops:[{time:"10:00",icon:"🚇",title:"Metro Jaume I",desc:"Línea 4 amarilla. Salida directa al Gótico.",tag:"Viaje",tagColor:"muted"},{time:"10:15",icon:"🏛️",title:"Barrio Gótico",desc:"Catedral, Pont del Bisbe, Plaça Reial. 2h sin prisas.",tag:"Cultura",tagColor:"accent"},{time:"12:30",icon:"🛒",title:"Mercat de Santa Caterina",desc:"Sin turistas. Tapa de calamar y vermut. ~10€.",tag:"Gastronomía",tagColor:"orange"},{time:"14:00",icon:"🦞",title:"La Mar Salada",desc:"Arròs negre y mariscos. Terraza con vistas al mar. ~30€.",tag:"Restaurante",tagColor:"orange"},{time:"16:00",icon:"🏖️",title:"Barceloneta",desc:"Paseo marítimo hasta el Port Olímpic.",tag:"Ocio",tagColor:"green"}], tips:["Evita la Barceloneta en agosto","El Mercat de Santa Caterina abre L-S hasta las 15h"] },
   { id:"m4", emoji:"🏖️", title:"Costa Brava: Calella + Begur + Pals medieval", subtitle:"Calas de roca, castillo medieval y gastronomía de mar", zone:"Girona · 1h 45min", vibe:"naturaleza", budget:"mid", transport:"yes", votes_count:231, duration:"Día completo", img:"https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80", photos:[], stops:[{time:"09:00",icon:"🚗",title:"Salida hacia Calella",desc:"AP-7. Aparcamiento en el pueblo, a pie a las calas.",tag:"Viaje",tagColor:"muted"},{time:"11:00",icon:"🏊",title:"Calas de Calella de Palafrugell",desc:"Aguas cristalinas. Las más bonitas de la Costa Brava.",tag:"Naturaleza",tagColor:"green"},{time:"13:30",icon:"🐟",title:"Sa Riera",desc:"Pescado fresco del día en primera línea de mar.",tag:"Restaurante",tagColor:"orange"},{time:"15:30",icon:"🏰",title:"Begur",desc:"Castillo medieval con vistas al mar.",tag:"Cultura",tagColor:"accent"},{time:"17:00",icon:"🏘️",title:"Pals medieval",desc:"Uno de los pueblos medievales mejor conservados.",tag:"Cultura",tagColor:"accent"}], tips:["Llega antes de las 10h a las calas en verano","Pals es precioso al atardecer"] },
   { id:"m5", emoji:"🌊", title:"Delta del Ebro + Flamencos + Arroz del Delta", subtitle:"Naturaleza salvaje, flamencos rosas y el mejor arroz", zone:"Tarragona · 2h", vibe:"naturaleza", budget:"low", transport:"yes", votes_count:178, duration:"Día completo", img:"https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800&q=80", photos:[], stops:[{time:"08:00",icon:"🚗",title:"Salida hacia el Delta",desc:"AP-7. Llegada a Deltebre en 2h.",tag:"Viaje",tagColor:"muted"},{time:"10:00",icon:"🦩",title:"Observatorio de flamencos",desc:"Miles de flamencos rosas. Mejor con prismáticos.",tag:"Naturaleza",tagColor:"green"},{time:"12:00",icon:"🚤",title:"Crucero por los canales",desc:"Recorrido en barca. ~15€/persona.",tag:"Actividad",tagColor:"accent"},{time:"14:00",icon:"🍚",title:"L'Algadir del Delta",desc:"El mejor arroz del Delta. ~25€.",tag:"Restaurante",tagColor:"orange"},{time:"16:00",icon:"🌅",title:"Playa del Trabucador",desc:"Lengua de arena entre el mar y la laguna.",tag:"Naturaleza",tagColor:"green"}], tips:["Lleva ropa para el viento","Mejor época: primavera y otoño"] },
@@ -220,7 +220,15 @@ const db = {
     try {
       const existing = JSON.parse(localStorage.getItem("op_saved") || "[]");
       if (!existing.find(p => p.id === plan.id)) {
-        existing.unshift({id:plan.id, title:plan.title, subtitle:plan.subtitle, zone:plan.zone, emoji:plan.emoji, img:plan.img, votes_count:plan.votes_count||0});
+        // Save FULL plan object so it can be opened with all details
+        existing.unshift({
+          id: plan.id, title: plan.title, subtitle: plan.subtitle,
+          zone: plan.zone, emoji: plan.emoji, img: plan.img,
+          votes_count: plan.votes_count||0, vibe: plan.vibe,
+          budget: plan.budget, transport: plan.transport,
+          stops: plan.stops||[], tips: plan.tips||[],
+          photos: plan.photos||[], duration: plan.duration,
+        });
         localStorage.setItem("op_saved", JSON.stringify(existing.slice(0,50)));
       }
     } catch {}
@@ -240,8 +248,17 @@ const db = {
   saveMyPlanLocal(plan) {
     try {
       const existing = JSON.parse(localStorage.getItem("op_my_plans") || "[]");
-      existing.unshift({id:plan.id||`my-${Date.now()}`, title:plan.title, subtitle:plan.subtitle, zone:plan.zone, emoji:plan.emoji, img:plan.img||null, votes_count:0});
-      localStorage.setItem("op_my_plans", JSON.stringify(existing.slice(0,50)));
+      if (!existing.find(p => p.id === plan.id)) {
+        existing.unshift({
+          id: plan.id||`gen-${Date.now()}`,
+          title: plan.title, subtitle: plan.subtitle,
+          zone: plan.zone, emoji: plan.emoji, img: plan.img||null,
+          votes_count: 0, stops: plan.stops||[], tips: plan.tips||[],
+          photos: plan.photos||[], vibe: plan.vibe, budget: plan.budget,
+          is_ai_generated: plan.is_ai_generated!==false,
+        });
+        localStorage.setItem("op_my_plans", JSON.stringify(existing.slice(0,50)));
+      }
     } catch {}
   },
 
@@ -443,11 +460,16 @@ function FiltersPanel({t, onClose, onApply, activeFilters}) {
 
   const sheetRef = useRef();
   const touchStartY = useRef(0);
+  const touchStartScrollTop = useRef(0);
 
-  const handleTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
+  const handleTouchStart = (e) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchStartScrollTop.current = sheetRef.current?.scrollTop || 0;
+  };
   const handleTouchEnd = (e) => {
     const diff = e.changedTouches[0].clientY - touchStartY.current;
-    if (diff > 80) onClose();
+    // Only close if: swiped down >80px AND sheet was at top when swipe started
+    if (diff > 80 && touchStartScrollTop.current < 10) onClose();
   };
 
   return (
@@ -956,21 +978,41 @@ function TimeSelector({t, onComplete}) {
   const [sh, setSh] = useState(9);
   const [eh, setEh] = useState(20);
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const today = now.getDate();
-  const daysInMonth = new Date(year,month+1,0).getDate();
-  const rawFirst = new Date(year,month,1).getDay();
+  // Month navigation
+  const nowRef = new Date();
+  const [viewYear, setViewYear] = useState(nowRef.getFullYear());
+  const [viewMonth, setViewMonth] = useState(nowRef.getMonth());
+
+  const todayYear = nowRef.getFullYear();
+  const todayMonth = nowRef.getMonth();
+  const todayDay = nowRef.getDate();
+
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+  const rawFirst = new Date(viewYear, viewMonth, 1).getDay();
   const fd = rawFirst===0?6:rawFirst-1;
-  const monthName = now.toLocaleString("es",{month:"long",year:"numeric"});
+  const monthName = new Date(viewYear, viewMonth, 1).toLocaleString("es",{month:"long",year:"numeric"});
   const fmt = h=>`${String(h).padStart(2,"0")}:00`;
 
+  const isCurrentMonth = viewYear===todayYear && viewMonth===todayMonth;
+  const isPast = (day) => isCurrentMonth && day < todayDay;
+
+  const prevMonth = () => {
+    if (isCurrentMonth) return; // can't go before current month
+    if (viewMonth===0) { setViewMonth(11); setViewYear(viewYear-1); }
+    else setViewMonth(viewMonth-1);
+    setSel(null); setEnd(null);
+  };
+  const nextMonth = () => {
+    if (viewMonth===11) { setViewMonth(0); setViewYear(viewYear+1); }
+    else setViewMonth(viewMonth+1);
+    setSel(null); setEnd(null);
+  };
+
   const click = day => {
-    if (day<today) return;
+    if (isPast(day)) return;
     if (mode==="day") { setSel(day); setEnd(day); }
     else if (mode==="weekend") {
-      const dow = new Date(year,month,day).getDay();
+      const dow = new Date(viewYear,viewMonth,day).getDay();
       let sat = dow===6?day:dow===0?day-1:day+(6-dow);
       sat = Math.min(sat,daysInMonth);
       setSel(sat); setEnd(Math.min(sat+1,daysInMonth));
@@ -982,6 +1024,7 @@ function TimeSelector({t, onComplete}) {
 
   const isSel = d=>d===sel||d===end;
   const isRange = d=>sel&&end&&end>sel&&d>sel&&d<end;
+  const isToday = d=>isCurrentMonth&&d===todayDay;
   const dur = !sel?null:(!end||end===sel)?"1 día":end-sel+1===2?"Fin de semana":`${end-sel+1} días`;
 
   return (
@@ -993,15 +1036,20 @@ function TimeSelector({t, onComplete}) {
       </div>
 
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:16,marginBottom:14}}>
-        <div style={{textAlign:"center",fontSize:14,fontWeight:800,color:C.black,marginBottom:12,textTransform:"capitalize"}}>{monthName}</div>
+        {/* Month navigation */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+          <button onClick={prevMonth} disabled={isCurrentMonth} style={{background:"transparent",border:"none",fontSize:18,cursor:isCurrentMonth?"default":"pointer",color:isCurrentMonth?C.dim:C.black,padding:"0 8px"}}>‹</button>
+          <div style={{textAlign:"center",fontSize:14,fontWeight:800,color:C.black,textTransform:"capitalize"}}>{monthName}</div>
+          <button onClick={nextMonth} style={{background:"transparent",border:"none",fontSize:18,cursor:"pointer",color:C.black,padding:"0 8px"}}>›</button>
+        </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",marginBottom:6}}>
           {["L","M","X","J","V","S","D"].map(d=><div key={d} style={{textAlign:"center",fontSize:11,color:C.dim,fontWeight:700}}>{d}</div>)}
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
           {Array.from({length:fd},(_,i)=><div key={`e${i}`}/>)}
           {Array.from({length:daysInMonth},(_,i)=>{
-            const day=i+1; const s=isSel(day); const r=isRange(day); const past=day<today;
-            return <button key={day} onClick={()=>click(day)} style={{aspectRatio:"1",borderRadius:8,background:s?C.accent:r?C.accent+"40":"transparent",border:day===today&&!s?`2px solid ${C.accent}`:"1px solid transparent",color:s?C.accentText:past?C.dim:C.black,fontSize:13,fontWeight:s?800:400,cursor:past?"default":"pointer",fontFamily:F}}>{day}</button>;
+            const day=i+1; const s=isSel(day); const r=isRange(day); const past=isPast(day);
+            return <button key={day} onClick={()=>click(day)} style={{aspectRatio:"1",borderRadius:8,background:s?C.accent:r?C.accent+"40":"transparent",border:isToday(day)&&!s?`2px solid ${C.accent}`:"1px solid transparent",color:s?C.accentText:past?C.dim:C.black,fontSize:13,fontWeight:s?800:400,cursor:past?"default":"pointer",fontFamily:F}}>{day}</button>;
           })}
         </div>
         {sel&&<div style={{marginTop:10,textAlign:"center",fontSize:13,color:C.accentText,fontWeight:700,background:C.accent+"25",borderRadius:8,padding:"6px"}}>{mode==="custom"&&!end?"Selecciona el día de vuelta":`✓ ${dur} seleccionado`}</div>}
@@ -1036,7 +1084,7 @@ function TimeSelector({t, onComplete}) {
         </div>
       )}
 
-      <button onClick={()=>sel&&onComplete({date:sel,endDate:end,startHour:sh,endHour:eh,mode})}
+      <button onClick={()=>sel&&onComplete({date:sel,endDate:end,startHour:sh,endHour:eh,mode,year:viewYear,month:viewMonth})}
         style={{width:"100%",background:sel?C.black:C.border,color:sel?C.white:C.dim,border:"none",borderRadius:14,padding:"15px",fontSize:15,fontWeight:700,cursor:sel?"pointer":"default",fontFamily:F}}>
         {sel?`Continuar con ${dur} →`:t.selectDay}
       </button>
@@ -1139,7 +1187,14 @@ function LoadingScreen({t}) {
 function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error}) {
   const [saved, setSaved] = useState(false);
 
-  const handleSave = () => { setSaved(true); if (plan) db.saveToLocal({...plan,id:plan.id||`gen-${Date.now()}`}); };
+  const handleSave = () => {
+    setSaved(true);
+    if (plan) {
+      const planWithId = {...plan, id: plan.id||`gen-${Date.now()}`, is_ai_generated: true};
+      db.saveToLocal(planWithId);
+      db.saveMyPlanLocal(planWithId);
+    }
+  };
 
   if (error) return (
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,paddingTop:80}}>
@@ -1277,7 +1332,7 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
         )}
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:20}}>
-          {[{n:"0",l:t.generatedLbl},{n:String(savedPlans.length),l:t.savedPlans},{n:String(myPlans.length),l:t.myPlans}].map((s,i)=>(
+          {[{n:String(myPlans.length),l:"Mis planes"},{n:String(savedPlans.length),l:t.savedPlans},{n:String(myPlans.filter(p=>!p.is_ai_generated).length),l:"Subidos"}].map((s,i)=>(
             <div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:"14px 8px",textAlign:"center"}}>
               <div style={{fontFamily:F,fontSize:26,fontWeight:900,color:C.accent}}>{s.n}</div>
               <div style={{fontSize:11,color:C.muted,lineHeight:1.3,marginTop:4}}>{s.l}</div>
@@ -1300,7 +1355,7 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
                     <div style={{fontSize:13,fontWeight:700,color:C.black,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.title}</div>
                     <div style={{fontSize:11,color:C.muted}}>{p.zone}</div>
                   </div>
-                  <button onClick={()=>{db.removeSavedLocal(p.id);setSavedPlans(db.getSavedLocal());}} style={{background:"transparent",border:"none",color:C.dim,cursor:"pointer",fontSize:16}}>×</button>
+                  <button onClick={e=>{e.stopPropagation();db.removeSavedLocal(p.id);setSavedPlans(db.getSavedLocal());}} style={{background:"transparent",border:"none",color:C.dim,cursor:"pointer",fontSize:16}}>×</button>
                 </div>
               ))}
             </div>
@@ -1311,6 +1366,26 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
             </div>
           )}
         </div>
+
+        {myPlans.length>0&&(
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:16,marginBottom:20}}>
+            <h3 style={{fontFamily:F,fontSize:15,fontWeight:800,color:C.black,marginBottom:14}}>Mis planes</h3>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {myPlans.map((p,i)=>(
+                <div key={i} onClick={()=>onPlanClick&&onPlanClick(p)} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0",borderBottom:i<myPlans.length-1?`1px solid ${C.border}`:"none",cursor:"pointer"}}>
+                  {p.img?<img src={p.img} style={{width:48,height:48,borderRadius:10,objectFit:"cover",flexShrink:0}} alt="" onError={e=>e.target.style.display="none"}/>:<span style={{fontSize:28,flexShrink:0}}>{p.emoji||"🗺️"}</span>}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:700,color:C.black,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.title}</div>
+                    <div style={{fontSize:11,color:C.muted,display:"flex",gap:8}}>
+                      <span>{p.zone}</span>
+                      <span style={{background:p.is_ai_generated?C.accent+"30":"transparent",color:C.accentText,borderRadius:8,padding:"0 4px",fontSize:10}}>{p.is_ai_generated?"✦ IA":"📝 Subido"}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:16}}>
           <div style={{fontSize:13,fontWeight:800,color:C.black,marginBottom:14,fontFamily:F}}>🌐 {t.language}</div>
@@ -1374,8 +1449,12 @@ function UserProfileScreen({userId, userName, t, onBack}) {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [screen, setScreen] = useState("feed");
-  const [screenParams, setScreenParams] = useState({});
+  const [screen, setScreen] = useState(()=>{
+    try { return sessionStorage.getItem("op_screen")||"feed"; } catch { return "feed"; }
+  });
+  const [screenParams, setScreenParams] = useState(()=>{
+    try { return JSON.parse(sessionStorage.getItem("op_screen_params")||"{}"); } catch { return {}; }
+  });
   const [lang, setLang] = useState(()=>{ try{return localStorage.getItem("op_lang")||"es";}catch{return"es";} });
   const [timeData, setTimeData] = useState(null);
   const [answers, setAnswers] = useState(null);
@@ -1394,7 +1473,11 @@ export default function App() {
   // Restore session
   useEffect(()=>{ const s=auth.load(); if(s?.token) setUser(s); },[]);
 
-  const go = (s, params={}) => { setScreen(s); setScreenParams(params); window.scrollTo(0,0); };
+  const go = (s, params={}) => {
+    setScreen(s); setScreenParams(params);
+    try { sessionStorage.setItem("op_screen", s); sessionStorage.setItem("op_screen_params", JSON.stringify(params)); } catch {}
+    if (s !== "profile") window.scrollTo(0,0);
+  };
   const requireAuth = () => setShowAuth(true);
   const handleUpload = () => { if(!user){setShowAuth(true);return;} setShowUpload(true); };
   const handleLogout = () => { auth.clear(); setUser(null); };
