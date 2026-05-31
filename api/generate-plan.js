@@ -16,13 +16,30 @@ export default async function handler(req, res) {
   const hours = timeData ? (timeData.endHour||20) - (timeData.startHour||9) : 10;
   const start = timeData ? `${String(timeData.startHour||9).padStart(2, "0")}:00` : "09:00";
 
+  const transportText = answers.transport === "yes"
+    ? "con coche propio (puedes ir a cualquier lugar accesible en coche)"
+    : "SIN coche, SOLO transporte público (tren, bus, metro). PROHIBIDO mencionar aparcamiento, conducir o lugares solo accesibles en coche. Todos los desplazamientos deben ser en transporte público desde " + answers.location;
+
   const prompt = `Eres OnlyPlans. Responde ${lang === "ca" ? "en catalán" : "en español"}.
 Genera un plan de fin de semana para alguien que sale desde: ${answers.location}
-Grupo: ${groups[answers.group]||"amigos"}, Transporte: ${answers.transport==="yes"?"coche":"transporte público"}, Presupuesto: ${budgets[answers.budget]||"normal"}, Tipo: ${vibes[answers.vibe]||"naturaleza"}, Duración: ${hours}h desde las ${start}.
-IMPORTANTE: Sale desde ${answers.location}. La última parada es la vuelta a ${answers.location}.
-Responde SOLO con JSON válido:
-{"title":"...","subtitle":"...","zone":"destino · Xmin desde ${answers.location}","emoji":"🗺️","stops":[{"time":"HH:MM","icon":"emoji","title":"lugar","desc":"descripción práctica","tag":"Viaje","tagColor":"muted"}],"tips":["consejo"]}
-Incluye 5-7 paradas con nombres reales de España.`;
+- Grupo: ${groups[answers.group]||"amigos"}
+- Transporte: ${transportText}
+- Presupuesto: ${budgets[answers.budget]||"normal"}
+- Tipo: ${vibes[answers.vibe]||"naturaleza"}
+- Duración: ${hours}h desde las ${start}
+
+REGLAS OBLIGATORIAS:
+1. Todos los lugares deben estar en España.
+2. El recorrido debe ser COHERENTE geográficamente (no saltar de ciudad en ciudad).
+3. Los tiempos deben ser REALISTAS para ${answers.transport==="yes"?"coche":"transporte público"}.
+4. La primera parada es la SALIDA desde ${answers.location}.
+5. La última parada es la VUELTA a ${answers.location}.
+6. ${answers.transport!=="yes" ? "SOLO transporte público. No menciones coche, aparcamiento ni conducir en ninguna parada." : ""}
+
+Responde SOLO con JSON válido sin texto extra:
+{"title":"título atractivo","subtitle":"descripción corta","zone":"destino principal · Xmin desde ${answers.location}","emoji":"emoji relevante","stops":[{"time":"HH:MM","icon":"emoji","title":"nombre del lugar","desc":"descripción práctica con precio aproximado si aplica","tag":"Viaje|Cultura|Naturaleza|Restaurante|Actividad","tagColor":"muted|green|orange|accent|purple"}],"tips":["consejo práctico 1","consejo práctico 2"]}
+
+Incluye exactamente 5-7 paradas con nombres reales.`;
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
