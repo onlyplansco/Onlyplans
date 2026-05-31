@@ -174,20 +174,32 @@ const db = {
     let url = `${SUPABASE_URL}/rest/v1/plans?is_approved=eq.true&order=votes_count.desc&limit=30`;
     const vibeMap = { "Montaña":"naturaleza","Muntanya":"naturaleza","Playa":"naturaleza","Platja":"naturaleza","Pueblos":"cultura","Pobles":"cultura","Ciudad":"cultura","Ciutat":"cultura","Gastronomía":"gastronomia","Gastronomia":"gastronomia","Espectáculos":"aventura","Espectacles":"aventura" };
     if (vibeMap[filter]) url += `&vibe=eq.${vibeMap[filter]}`;
+
+    // Get local user-uploaded plans (non-AI)
+    const localUploaded = (()=>{ try { return JSON.parse(localStorage.getItem("op_my_plans")||"[]").filter(p=>!p.is_ai_generated); } catch { return []; } })();
+
     try {
       const r = await fetch(url, {headers:this.h});
       const d = await r.json();
       if (Array.isArray(d) && d.length > 0) {
-        return sortRandom ? [...d].sort(()=>Math.random()-0.5) : d;
+        // Merge local uploaded plans that aren't already in db results
+        const dbIds = new Set(d.map(p=>p.id));
+        const extras = localUploaded.filter(p=>!dbIds.has(p.id));
+        const merged = [...extras, ...d];
+        return sortRandom ? [...merged].sort(()=>Math.random()-0.5) : merged;
       }
     } catch {}
-    // Fallback to MOCK with local filtering
-    let result = [...MOCK];
-    if (vibeMap[filter]) result = result.filter(p => p.vibe === vibeMap[filter]);
-    if (filter === "Playa" || filter === "Platja") result = MOCK.filter(p => p.emoji === "🏖️" || p.title.toLowerCase().includes("costa") || p.title.toLowerCase().includes("delta"));
-    if (filter === "Montaña" || filter === "Muntanya") result = MOCK.filter(p => p.emoji === "⛰️");
-    if (filter === "Pueblos" || filter === "Pobles") result = MOCK.filter(p => p.emoji === "🏰");
-    if (result.length === 0) result = MOCK;
+
+    // Fallback to MOCK + local uploaded
+    let result = [...localUploaded, ...MOCK];
+    if (vibeMap[filter]) {
+      const vibe = vibeMap[filter];
+      result = result.filter(p => p.vibe === vibe);
+    }
+    if (filter === "Playa" || filter === "Platja") result = [...localUploaded.filter(p=>p.vibe==="naturaleza"), ...MOCK.filter(p => p.emoji === "🏖️" || p.title.toLowerCase().includes("costa") || p.title.toLowerCase().includes("delta"))];
+    if (filter === "Montaña" || filter === "Muntanya") result = [...localUploaded.filter(p=>p.vibe==="naturaleza"), ...MOCK.filter(p => p.emoji === "⛰️")];
+    if (filter === "Pueblos" || filter === "Pobles") result = [...localUploaded.filter(p=>p.vibe==="cultura"), ...MOCK.filter(p => p.emoji === "🏰")];
+    if (result.length === 0) result = [...localUploaded, ...MOCK];
     return sortRandom ? [...result].sort(()=>Math.random()-0.5) : result;
   },
 
@@ -266,6 +278,13 @@ const db = {
     try { return JSON.parse(localStorage.getItem("op_my_plans") || "[]"); } catch { return []; }
   },
 
+  removeMyPlanLocal(id) {
+    try {
+      const existing = JSON.parse(localStorage.getItem("op_my_plans") || "[]");
+      localStorage.setItem("op_my_plans", JSON.stringify(existing.filter(p => p.id !== id)));
+    } catch {}
+  },
+
   async updateProfile(userId, data, token) {
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
@@ -328,19 +347,33 @@ function Btn({children,onClick,variant="black",style={}}) {
 // ── Photo Carousel ────────────────────────────────────────────────────────────
 function PhotoCarousel({photos, fallback, height=220}) {
   const [idx, setIdx] = useState(0);
-  // Normalize: filter out null/empty values
+  const touchStartX = useRef(0);
+
   const photoList = Array.isArray(photos) ? photos.filter(Boolean) : [];
   const imgs = photoList.length > 0 ? photoList : (fallback ? [fallback] : []);
   if (!imgs.length) return <div style={{height,background:`linear-gradient(135deg,${C.accent}30,${C.accent}10)`}}/>;
 
+  const prev = (e) => { e?.stopPropagation(); setIdx(i=>(i-1+imgs.length)%imgs.length); };
+  const next = (e) => { e?.stopPropagation(); setIdx(i=>(i+1)%imgs.length); };
+
+  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchEnd = (e) => {
+    const diff = touchStartX.current - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 40) { diff > 0 ? next() : prev(); }
+  };
+
   return (
-    <div style={{position:"relative",height,overflow:"hidden",background:`linear-gradient(135deg,${C.accent}30,${C.accent}10)`}}>
+    <div
+      style={{position:"relative",height,overflow:"hidden",background:`linear-gradient(135deg,${C.accent}30,${C.accent}10)`}}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       <img src={imgs[idx]} alt="" style={{width:"100%",height:"100%",objectFit:"cover",transition:"opacity 0.3s"}} onError={e=>{e.target.style.display="none";}}/>
       <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,0.45) 0%,transparent 55%)"}}/>
       {imgs.length > 1 && (
         <>
-          <button onClick={e=>{e.stopPropagation();setIdx((idx-1+imgs.length)%imgs.length);}} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,0.8)",border:"none",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
-          <button onClick={e=>{e.stopPropagation();setIdx((idx+1)%imgs.length);}} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,0.8)",border:"none",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
+          <button onClick={prev} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,0.8)",border:"none",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+          <button onClick={next} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,0.8)",border:"none",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
           <div style={{position:"absolute",bottom:8,left:"50%",transform:"translateX(-50%)",display:"flex",gap:4}}>
             {imgs.map((_,i)=><div key={i} style={{width:i===idx?12:6,height:6,borderRadius:3,background:i===idx?"#fff":"rgba(255,255,255,0.5)",transition:"all 0.2s"}}/>)}
           </div>
@@ -392,7 +425,7 @@ function FeedCard({plan, t, onClick, user, onRequireAuth}) {
       onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 28px rgba(0,0,0,0.1)";}}
       onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 1px 12px rgba(0,0,0,0.05)";}}>
       <div style={{position:"relative"}}>
-        <PhotoCarousel photos={plan.photos} fallback={plan.img} height={210}/>
+        <PhotoCarousel photos={plan.photos} fallback={plan.img||""} height={210}/>
         <div style={{position:"absolute",top:12,left:12,background:"rgba(255,255,255,0.88)",backdropFilter:"blur(8px)",borderRadius:20,padding:"4px 11px",fontSize:11,fontWeight:600,color:C.black}}>
           📍 {plan.zone}
         </div>
@@ -1210,7 +1243,7 @@ function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error}) {
       <div style={{padding:"20px 16px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <button onClick={onBack} style={{background:"transparent",border:"none",color:C.muted,cursor:"pointer",fontSize:14,fontFamily:F}}>← Inicio</button>
-          <Btn onClick={handleSave} variant={saved?"accent":"ghost"} style={{padding:"7px 16px",fontSize:12,borderRadius:20}}>{saved?t.saved:t.save}</Btn>
+          <span style={{fontSize:12,color:C.muted}}>Plan generado por IA</span>
         </div>
         {plan&&(
           <>
@@ -1250,9 +1283,10 @@ function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error}) {
             )}
           </>
         )}
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          <Btn onClick={onRegen} variant="black" style={{width:"100%",padding:"15px",fontSize:15,borderRadius:14}}>{t.generateNew}</Btn>
-          <Btn onClick={()=>go("feed")} variant="ghost" style={{width:"100%",padding:"15px",borderRadius:14}}>Ver más planes →</Btn>
+        <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:8}}>
+          <Btn onClick={handleSave} variant={saved?"accent":"black"} style={{width:"100%",padding:"15px",fontSize:15,borderRadius:14}}>{saved?"✓ "+t.saved:t.save+" este plan"}</Btn>
+          <Btn onClick={onRegen} variant="ghost" style={{width:"100%",padding:"14px",borderRadius:14}}>{t.generateNew}</Btn>
+          <Btn onClick={()=>go("feed")} variant="ghost" style={{width:"100%",padding:"14px",borderRadius:14}}>Ver más planes →</Btn>
         </div>
       </div>
     </div>
@@ -1292,103 +1326,110 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
   const initial = (user?.name||user?.email||"U")[0].toUpperCase();
 
   return (
-    <div style={{minHeight:"100vh",background:C.bg,paddingTop:52,paddingBottom:40,overscrollBehaviorY:"contain"}}>
-      <div style={{padding:"24px 16px"}}>
-        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20}}>
-          <div onClick={()=>editMode&&avatarRef.current.click()} style={{width:64,height:64,borderRadius:"50%",background:C.accent,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,fontWeight:900,color:C.accentText,fontFamily:F,cursor:editMode?"pointer":"default",overflow:"hidden",flexShrink:0,position:"relative"}}>
-            {avatar?<img src={avatar} style={{width:64,height:64,objectFit:"cover"}} alt=""/>:initial}
-            {editMode&&<div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>📷</div>}
-          </div>
-          <input ref={avatarRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];if(f)setAvatar(URL.createObjectURL(f));}}/>
-          <div style={{flex:1}}>
-            <div style={{fontFamily:F,fontSize:18,fontWeight:900,color:C.black}}>{user?.name||"Mi perfil"}</div>
-            <div style={{fontSize:12,color:C.muted}}>{user?.email}</div>
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>{
-              if (editMode) {
-                // Save profile
-                try {
-                  localStorage.setItem("op_profile", JSON.stringify({bio, avatar}));
-                } catch {}
-              }
-              setEditMode(!editMode);
-            }} style={{background:editMode?C.accent:"transparent",border:`1px solid ${editMode?C.accent:C.border}`,borderRadius:20,padding:"6px 14px",fontSize:12,color:editMode?C.accentText:C.muted,cursor:"pointer",fontFamily:F,fontWeight:editMode?700:400}}>{editMode?t.saveProfile:t.editProfile}</button>
-            <button onClick={onLogout} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:20,padding:"6px 14px",fontSize:12,color:C.muted,cursor:"pointer",fontFamily:F}}>{t.logout}</button>
-          </div>
+    <div style={{minHeight:"100vh",background:C.bg,paddingTop:52,paddingBottom:60,overscrollBehaviorY:"contain"}}>
+
+      {/* Cover + Avatar */}
+      <div style={{position:"relative",height:120,background:`linear-gradient(135deg,${C.accent}60,${C.accentDark}80)`,marginBottom:50}}>
+        <div style={{position:"absolute",bottom:-40,left:20,width:80,height:80,borderRadius:"50%",background:C.accent,border:`3px solid ${C.bg}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,fontWeight:900,color:C.accentText,fontFamily:F,overflow:"hidden",cursor:editMode?"pointer":"default"}}
+          onClick={()=>editMode&&avatarRef.current.click()}>
+          {avatar?<img src={avatar} style={{width:80,height:80,objectFit:"cover"}} alt=""/>:initial}
+          {editMode&&<div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>📷</div>}
+        </div>
+        <input ref={avatarRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];if(f)setAvatar(URL.createObjectURL(f));}}/>
+        <div style={{position:"absolute",top:12,right:12,display:"flex",gap:8}}>
+          <button onClick={()=>{
+            if (editMode) { try { localStorage.setItem("op_profile", JSON.stringify({bio, avatar})); } catch {} }
+            setEditMode(!editMode);
+          }} style={{background:editMode?C.black:C.bg,color:editMode?C.white:C.muted,border:`1px solid ${editMode?C.black:C.border}`,borderRadius:20,padding:"6px 14px",fontSize:12,cursor:"pointer",fontFamily:F,fontWeight:700}}>
+            {editMode?t.saveProfile:t.editProfile}
+          </button>
+          <button onClick={onLogout} style={{background:"rgba(255,255,255,0.8)",border:"none",borderRadius:20,padding:"6px 14px",fontSize:12,color:C.muted,cursor:"pointer",fontFamily:F}}>{t.logout}</button>
+        </div>
+      </div>
+
+      <div style={{padding:"0 16px"}}>
+        {/* Name + bio */}
+        <div style={{marginBottom:16}}>
+          <div style={{fontFamily:F,fontSize:20,fontWeight:900,color:C.black,marginBottom:2}}>{user?.name||"Mi perfil"}</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:8}}>{user?.email}</div>
+          {editMode ? (
+            <textarea value={bio} onChange={e=>setBio(e.target.value)} placeholder={t.bioPlaceholder} style={{width:"100%",background:C.card,border:`1.5px solid ${C.accent}`,borderRadius:12,padding:"10px 14px",fontSize:13,color:C.text,outline:"none",fontFamily:F,minHeight:70,resize:"none",boxSizing:"border-box"}}/>
+          ) : bio ? (
+            <div style={{fontSize:13,color:C.text,lineHeight:1.6}}>{bio}</div>
+          ) : (
+            <button onClick={()=>setEditMode(true)} style={{background:"transparent",border:`1px dashed ${C.border}`,borderRadius:10,padding:"8px 14px",fontSize:12,color:C.dim,cursor:"pointer",fontFamily:F}}>+ Añadir bio</button>
+          )}
         </div>
 
-        {editMode && (
-          <div style={{marginBottom:20}}>
-            <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:0.6,marginBottom:8}}>{t.bio}</div>
-            <textarea value={bio} onChange={e=>setBio(e.target.value)} placeholder={t.bioPlaceholder} style={{width:"100%",background:C.card,border:`1.5px solid ${C.accent}`,borderRadius:12,padding:"12px 14px",fontSize:14,color:C.text,outline:"none",fontFamily:F,minHeight:80,resize:"none",boxSizing:"border-box"}}/>
-          </div>
-        )}
-
-        {!editMode&&bio&&(
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:14,marginBottom:20}}>
-            <div style={{fontSize:13,color:C.text,lineHeight:1.6}}>{bio}</div>
-          </div>
-        )}
-
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:20}}>
-          {[{n:String(myPlans.length),l:"Mis planes"},{n:String(savedPlans.length),l:t.savedPlans},{n:String(myPlans.filter(p=>!p.is_ai_generated).length),l:"Subidos"}].map((s,i)=>(
-            <div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:"14px 8px",textAlign:"center"}}>
-              <div style={{fontFamily:F,fontSize:26,fontWeight:900,color:C.accent}}>{s.n}</div>
-              <div style={{fontSize:11,color:C.muted,lineHeight:1.3,marginTop:4}}>{s.l}</div>
+        {/* Stats */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:1,background:C.border,borderRadius:16,overflow:"hidden",marginBottom:20}}>
+          {[{n:String(myPlans.length),l:"Planes"},{n:String(savedPlans.length),l:"Guardados"},{n:String(myPlans.filter(p=>!p.is_ai_generated).length),l:"Subidos"}].map((s,i)=>(
+            <div key={i} style={{background:C.card,padding:"16px 8px",textAlign:"center"}}>
+              <div style={{fontFamily:F,fontSize:22,fontWeight:900,color:C.black}}>{s.n}</div>
+              <div style={{fontSize:11,color:C.muted,marginTop:2}}>{s.l}</div>
             </div>
           ))}
         </div>
 
-        <Btn onClick={onUpload} variant="accent" style={{width:"100%",padding:"14px",fontSize:14,borderRadius:14,marginBottom:20}}>
+        {/* Upload CTA */}
+        <Btn onClick={onUpload} variant="black" style={{width:"100%",padding:"13px",fontSize:14,borderRadius:14,marginBottom:24}}>
           📝 {t.uploadPlan}
         </Btn>
 
-        <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:16,marginBottom:20}}>
-          <h3 style={{fontFamily:F,fontSize:15,fontWeight:800,color:C.black,marginBottom:14}}>{t.savedPlans}</h3>
-          {savedPlans.length>0?(
-            <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {savedPlans.map((p,i)=>(
-                <div key={i} onClick={()=>onPlanClick&&onPlanClick(p)} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0",borderBottom:i<savedPlans.length-1?`1px solid ${C.border}`:"none",cursor:"pointer"}}>
-                  {p.img?<img src={p.img} style={{width:48,height:48,borderRadius:10,objectFit:"cover",flexShrink:0}} alt="" onError={e=>e.target.style.display="none"}/>:<span style={{fontSize:28,flexShrink:0}}>{p.emoji||"🗺️"}</span>}
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:700,color:C.black,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.title}</div>
-                    <div style={{fontSize:11,color:C.muted}}>{p.zone}</div>
-                  </div>
-                  <button onClick={e=>{e.stopPropagation();db.removeSavedLocal(p.id);setSavedPlans(db.getSavedLocal());}} style={{background:"transparent",border:"none",color:C.dim,cursor:"pointer",fontSize:16}}>×</button>
-                </div>
-              ))}
-            </div>
-          ):(
-            <div style={{textAlign:"center",padding:"20px 0"}}>
-              <div style={{fontSize:32,marginBottom:10}}>🗺️</div>
-              <div style={{fontSize:14,color:C.muted}}>{t.noSaved}</div>
-            </div>
-          )}
-        </div>
-
-        {myPlans.length>0&&(
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:16,marginBottom:20}}>
-            <h3 style={{fontFamily:F,fontSize:15,fontWeight:800,color:C.black,marginBottom:14}}>Mis planes</h3>
-            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {/* My plans gallery */}
+        {myPlans.length > 0 && (
+          <div style={{marginBottom:24}}>
+            <h3 style={{fontFamily:F,fontSize:15,fontWeight:800,color:C.black,marginBottom:12}}>Mis planes</h3>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               {myPlans.map((p,i)=>(
-                <div key={i} onClick={()=>onPlanClick&&onPlanClick(p)} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0",borderBottom:i<myPlans.length-1?`1px solid ${C.border}`:"none",cursor:"pointer"}}>
-                  {p.img?<img src={p.img} style={{width:48,height:48,borderRadius:10,objectFit:"cover",flexShrink:0}} alt="" onError={e=>e.target.style.display="none"}/>:<span style={{fontSize:28,flexShrink:0}}>{p.emoji||"🗺️"}</span>}
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:700,color:C.black,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.title}</div>
-                    <div style={{fontSize:11,color:C.muted,display:"flex",gap:8}}>
-                      <span>{p.zone}</span>
-                      <span style={{background:p.is_ai_generated?C.accent+"30":"transparent",color:C.accentText,borderRadius:8,padding:"0 4px",fontSize:10}}>{p.is_ai_generated?"✦ IA":"📝 Subido"}</span>
+                <div key={i} style={{borderRadius:14,overflow:"hidden",background:C.card,border:`1px solid ${C.border}`,cursor:"pointer",position:"relative"}}
+                  onClick={()=>onPlanClick&&onPlanClick(p)}>
+                  {p.img
+                    ? <img src={p.img} alt="" style={{width:"100%",height:100,objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
+                    : <div style={{width:"100%",height:100,background:`linear-gradient(135deg,${C.accent}40,${C.accent}20)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>{p.emoji||"🗺️"}</div>
+                  }
+                  <div style={{padding:"8px 10px 10px"}}>
+                    <div style={{fontSize:12,fontWeight:700,color:C.black,lineHeight:1.3,marginBottom:2,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{p.title}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={{fontSize:10,color:C.muted}}>{p.zone}</span>
+                      <span style={{fontSize:10,color:C.accentText}}>{p.is_ai_generated?"✦ IA":"📝"}</span>
                     </div>
                   </div>
+                  <button onClick={e=>{e.stopPropagation();db.removeMyPlanLocal(p.id);setMyPlans(db.getMyPlansLocal());}}
+                    style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,0.5)",border:"none",borderRadius:"50%",width:22,height:22,cursor:"pointer",fontSize:11,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
                 </div>
               ))}
             </div>
           </div>
         )}
 
+        {/* Saved plans */}
+        <div style={{marginBottom:24}}>
+          <h3 style={{fontFamily:F,fontSize:15,fontWeight:800,color:C.black,marginBottom:12}}>{t.savedPlans}</h3>
+          {savedPlans.length>0?(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {savedPlans.map((p,i)=>(
+                <div key={i} onClick={()=>onPlanClick&&onPlanClick(p)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 12px",background:C.card,border:`1px solid ${C.border}`,borderRadius:14,cursor:"pointer"}}>
+                  {p.img?<img src={p.img} style={{width:52,height:52,borderRadius:10,objectFit:"cover",flexShrink:0}} alt="" onError={e=>e.target.style.display="none"}/>:<span style={{fontSize:28,flexShrink:0}}>{p.emoji||"🗺️"}</span>}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:700,color:C.black,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.title}</div>
+                    <div style={{fontSize:11,color:C.muted}}>{p.zone}</div>
+                  </div>
+                  <button onClick={e=>{e.stopPropagation();db.removeSavedLocal(p.id);setSavedPlans(db.getSavedLocal());}} style={{background:"transparent",border:"none",color:C.dim,cursor:"pointer",fontSize:18,padding:"4px"}}>×</button>
+                </div>
+              ))}
+            </div>
+          ):(
+            <div style={{textAlign:"center",padding:"24px 0",background:C.card,border:`1px solid ${C.border}`,borderRadius:16}}>
+              <div style={{fontSize:32,marginBottom:8}}>🔖</div>
+              <div style={{fontSize:13,color:C.muted}}>{t.noSaved}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Language */}
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:16}}>
-          <div style={{fontSize:13,fontWeight:800,color:C.black,marginBottom:14,fontFamily:F}}>🌐 {t.language}</div>
+          <div style={{fontSize:13,fontWeight:800,color:C.black,marginBottom:12,fontFamily:F}}>🌐 {t.language}</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {[{code:"es",label:t.langEs},{code:"ca",label:t.langCa}].map(l=>(
               <button key={l.code} onClick={()=>setLang(l.code)} style={{background:lang===l.code?C.accent:C.bg,color:lang===l.code?C.accentText:C.muted,border:`1.5px solid ${lang===l.code?C.accent:C.border}`,borderRadius:12,padding:"12px 0",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F,transition:"all 0.2s"}}>{l.label}</button>
@@ -1530,9 +1571,9 @@ export default function App() {
 
       {screen!=="loading"&&<TopNav screen={screen} go={go} t={t} user={user} onCreatePlan={()=>go("time")} onUpload={handleUpload}/>}
 
-      {screen==="feed"&&<FeedScreen key={feedKey} t={t} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail");}} onUpload={handleUpload} user={user} onRequireAuth={requireAuth}/>}
-      {screen==="detail"&&selectedPlan&&<PlanDetail plan={selectedPlan} t={t} onBack={()=>go("feed")} user={user} onRequireAuth={requireAuth} go={go}/>}
-      {screen==="userProfile"&&<UserProfileScreen userId={screenParams.userId} userName={screenParams.userName} t={t} onBack={()=>go("feed")}/>}
+      {screen==="feed"&&<FeedScreen key={feedKey} t={t} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail",{from:"feed"});}} onUpload={handleUpload} user={user} onRequireAuth={requireAuth}/>}
+      {screen==="detail"&&selectedPlan&&<PlanDetail plan={selectedPlan} t={t} onBack={()=>go(screenParams.from||"feed")} user={user} onRequireAuth={requireAuth} go={go}/>}
+      {screen==="userProfile"&&<UserProfileScreen userId={screenParams.userId} userName={screenParams.userName} t={t} onBack={()=>go(screenParams.from||"feed")}/>}
       {screen==="time"&&(
         <div style={{minHeight:"100vh",background:C.bg,paddingTop:52}}>
           <div style={{padding:"20px 16px"}}>
@@ -1546,7 +1587,7 @@ export default function App() {
       {screen==="quiz"&&<QuizScreen t={t} timeData={timeData} onComplete={handleQuizComplete} onBack={()=>go("time")}/>}
       {screen==="loading"&&<LoadingScreen t={t}/>}
       {screen==="generated"&&<GeneratedPlan plan={generatedPlan} answers={answers} t={t} onBack={()=>go("feed")} onRegen={handleRegen} go={go} error={planError}/>}
-      {screen==="profile"&&<ProfileScreen t={t} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={()=>setShowAuth(true)} user={user} onLogout={handleLogout} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail");}}/> }
+      {screen==="profile"&&<ProfileScreen t={t} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={()=>setShowAuth(true)} user={user} onLogout={handleLogout} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail",{from:"profile"});}}/> }
     </div>
   );
 }
