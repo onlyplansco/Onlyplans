@@ -345,17 +345,25 @@ function Btn({children,onClick,variant="black",style={}}) {
 }
 
 // ── Photo Carousel ────────────────────────────────────────────────────────────
-function PhotoCarousel({photos, fallback, height=220}) {
+function PhotoCarousel({photos, fallback, height=220, emoji=""}) {
   const [idx, setIdx] = useState(0);
   const touchStartX = useRef(0);
 
-  const photoList = Array.isArray(photos) ? photos.filter(Boolean) : [];
-  const imgs = photoList.length > 0 ? photoList : (fallback ? [fallback] : []);
-  if (!imgs.length) return <div style={{height,background:`linear-gradient(135deg,${C.accent}30,${C.accent}10)`}}/>;
+  const validUrl = (u) => typeof u === "string" && u.startsWith("http");
+  const photoList = Array.isArray(photos) ? photos.filter(validUrl) : [];
+  const fallbackUrl = validUrl(fallback) ? fallback : null;
+  const imgs = photoList.length > 0 ? photoList : (fallbackUrl ? [fallbackUrl] : []);
 
-  const prev = (e) => { e?.stopPropagation(); setIdx(i=>(i-1+imgs.length)%imgs.length); };
-  const next = (e) => { e?.stopPropagation(); setIdx(i=>(i+1)%imgs.length); };
+  if (!imgs.length) {
+    return (
+      <div style={{height, background:`linear-gradient(135deg,${C.accent}30,${C.accent}10)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:56}}>
+        {emoji || "🗺️"}
+      </div>
+    );
+  }
 
+  const prev = (e) => { e?.stopPropagation(); setIdx(i => (i - 1 + imgs.length) % imgs.length); };
+  const next = (e) => { e?.stopPropagation(); setIdx(i => (i + 1) % imgs.length); };
   const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
   const handleTouchEnd = (e) => {
     const diff = touchStartX.current - e.changedTouches[0].clientX;
@@ -363,19 +371,17 @@ function PhotoCarousel({photos, fallback, height=220}) {
   };
 
   return (
-    <div
-      style={{position:"relative",height,overflow:"hidden",background:`linear-gradient(135deg,${C.accent}30,${C.accent}10)`}}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
-      <img src={imgs[idx]} alt="" style={{width:"100%",height:"100%",objectFit:"cover",transition:"opacity 0.3s"}} onError={e=>{e.target.style.display="none";}}/>
-      <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,0.45) 0%,transparent 55%)"}}/>
+    <div style={{position:"relative", height, overflow:"hidden", background:`linear-gradient(135deg,${C.accent}30,${C.accent}10)`}}
+      onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      <img src={imgs[idx]} alt="" style={{width:"100%", height:"100%", objectFit:"cover"}}
+        onError={e => { e.target.style.display = "none"; }}/>
+      <div style={{position:"absolute", inset:0, background:"linear-gradient(to top,rgba(0,0,0,0.45) 0%,transparent 55%)"}}/>
       {imgs.length > 1 && (
         <>
           <button onClick={prev} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,0.8)",border:"none",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
           <button onClick={next} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,0.8)",border:"none",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
           <div style={{position:"absolute",bottom:8,left:"50%",transform:"translateX(-50%)",display:"flex",gap:4}}>
-            {imgs.map((_,i)=><div key={i} style={{width:i===idx?12:6,height:6,borderRadius:3,background:i===idx?"#fff":"rgba(255,255,255,0.5)",transition:"all 0.2s"}}/>)}
+            {imgs.map((_,i) => <div key={i} style={{width:i===idx?12:6,height:6,borderRadius:3,background:i===idx?"#fff":"rgba(255,255,255,0.5)",transition:"all 0.2s"}}/>)}
           </div>
         </>
       )}
@@ -425,7 +431,7 @@ function FeedCard({plan, t, onClick, user, onRequireAuth}) {
       onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 28px rgba(0,0,0,0.1)";}}
       onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 1px 12px rgba(0,0,0,0.05)";}}>
       <div style={{position:"relative"}}>
-        <PhotoCarousel photos={plan.photos} fallback={plan.img||""} height={210}/>
+        <PhotoCarousel photos={plan.photos} fallback={plan.img} height={210} emoji={plan.emoji}/>
         <div style={{position:"absolute",top:12,left:12,background:"rgba(255,255,255,0.88)",backdropFilter:"blur(8px)",borderRadius:20,padding:"4px 11px",fontSize:11,fontWeight:600,color:C.black}}>
           📍 {plan.zone}
         </div>
@@ -491,24 +497,24 @@ function FiltersPanel({t, onClose, onApply, activeFilters}) {
     </div>
   );
 
-  const sheetRef = useRef();
   const touchStartY = useRef(0);
-  const touchStartScrollTop = useRef(0);
 
-  const handleTouchStart = (e) => {
-    touchStartY.current = e.touches[0].clientY;
-    touchStartScrollTop.current = sheetRef.current?.scrollTop || 0;
-  };
-  const handleTouchEnd = (e) => {
+  const handleDragStart = (e) => { touchStartY.current = e.touches[0].clientY; };
+  const handleDragEnd = (e) => {
     const diff = e.changedTouches[0].clientY - touchStartY.current;
-    // Only close if: swiped down >80px AND sheet was at top when swipe started
-    if (diff > 80 && touchStartScrollTop.current < 10) onClose();
+    if (diff > 60) onClose();
   };
 
   return (
     <div style={{position:"fixed",inset:0,background:C.overlay,zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div ref={sheetRef} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} style={{background:C.card,borderRadius:"20px 20px 0 0",padding:24,width:"100%",maxWidth:480,maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-        <div style={{width:36,height:4,background:C.border,borderRadius:2,margin:"0 auto 20px"}}/>
+      <div style={{background:C.card,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,maxHeight:"85vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+        {/* Drag handle — touch events here to swipe down and close */}
+        <div onTouchStart={handleDragStart} onTouchEnd={handleDragEnd}
+          style={{padding:"16px 24px 8px", flexShrink:0, cursor:"grab"}}>
+          <div style={{width:36,height:4,background:C.border,borderRadius:2,margin:"0 auto"}}/>
+        </div>
+        {/* Scrollable content — independent of drag handle */}
+        <div style={{overflowY:"auto", padding:"0 24px 24px", flex:1}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
           <span style={{fontFamily:F,fontSize:18,fontWeight:800,color:C.black}}>{t.filters}</span>
           <button onClick={()=>{setCat(null);setDist(null);setDur(null);setBudget(null);setTransport(null);setGroup(null);}} style={{background:"transparent",border:"none",fontSize:13,color:hasActive?C.black:C.dim,cursor:"pointer",fontFamily:F,fontWeight:hasActive?700:400}}>{t.clearFilters}</button>
@@ -541,7 +547,8 @@ function FiltersPanel({t, onClose, onApply, activeFilters}) {
         <Btn onClick={()=>{onApply({cat,dist,dur,budget,transport,group});onClose();}} variant="black" style={{width:"100%",padding:"15px",borderRadius:14,marginTop:4}}>
           {t.applyFilters} {hasActive?`(${[cat,dist,dur,budget,transport,group].filter(Boolean).length})`:""}
         </Btn>
-      </div>
+        </div>{/* end scrollable */}
+      </div>{/* end sheet */}
     </div>
   );
 }
@@ -562,6 +569,9 @@ function FeedScreen({t, go, onPlanClick, onUpload, user, onRequireAuth}) {
     setPlans(data);
     setLoading(false);
   };
+
+  // Load from Supabase on mount — this is what was missing
+  useEffect(() => { load("all", false); }, []);
 
   const handleCat = (f) => {
     const nf = filter===f?"all":f;
@@ -650,7 +660,7 @@ function PlanDetail({plan, t, onBack, user, onRequireAuth, go}) {
   return (
     <div style={{minHeight:"100vh",background:C.bg,paddingTop:52,paddingBottom:40}}>
       <div style={{position:"relative"}}>
-        <PhotoCarousel photos={plan.photos} fallback={plan.img} height={280}/>
+        <PhotoCarousel photos={plan.photos} fallback={plan.img} height={280} emoji={plan.emoji}/>
         <button onClick={onBack} style={{position:"absolute",top:16,left:16,background:"rgba(255,255,255,0.9)",backdropFilter:"blur(8px)",border:"none",borderRadius:20,padding:"8px 16px",cursor:"pointer",fontSize:13,fontWeight:600,color:C.black,fontFamily:F}}>← Volver</button>
         <div style={{position:"absolute",bottom:16,left:16,right:16}}>
           <div style={{fontSize:36,marginBottom:6}}>{plan.emoji}</div>
@@ -1335,7 +1345,13 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
           {avatar?<img src={avatar} style={{width:80,height:80,objectFit:"cover"}} alt=""/>:initial}
           {editMode&&<div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>📷</div>}
         </div>
-        <input ref={avatarRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];if(f)setAvatar(URL.createObjectURL(f));}}/>
+        <input ref={avatarRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => {
+          const f = e.target.files[0];
+          if (!f) return;
+          const reader = new FileReader();
+          reader.onload = (ev) => setAvatar(ev.target.result);
+          reader.readAsDataURL(f);
+        }}/>
         <div style={{position:"absolute",top:12,right:12,display:"flex",gap:8}}>
           <button onClick={()=>{
             if (editMode) { try { localStorage.setItem("op_profile", JSON.stringify({bio, avatar})); } catch {} }
@@ -1384,10 +1400,12 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
               {myPlans.map((p,i)=>(
                 <div key={i} style={{borderRadius:14,overflow:"hidden",background:C.card,border:`1px solid ${C.border}`,cursor:"pointer",position:"relative"}}
                   onClick={()=>onPlanClick&&onPlanClick(p)}>
-                  {p.img
-                    ? <img src={p.img} alt="" style={{width:"100%",height:100,objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
-                    : <div style={{width:"100%",height:100,background:`linear-gradient(135deg,${C.accent}40,${C.accent}20)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>{p.emoji||"🗺️"}</div>
-                  }
+                  {(() => {
+                    const src = p.img || (Array.isArray(p.photos) && p.photos[0]) || null;
+                    return src
+                      ? <img src={src} alt="" style={{width:"100%",height:100,objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
+                      : <div style={{width:"100%",height:100,background:`linear-gradient(135deg,${C.accent}40,${C.accent}20)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>{p.emoji||"🗺️"}</div>;
+                  })()}
                   <div style={{padding:"8px 10px 10px"}}>
                     <div style={{fontSize:12,fontWeight:700,color:C.black,lineHeight:1.3,marginBottom:2,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{p.title}</div>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
