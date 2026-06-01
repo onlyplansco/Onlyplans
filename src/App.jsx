@@ -431,7 +431,7 @@ function FeedCard({plan, t, onClick, user, onRequireAuth}) {
       onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 28px rgba(0,0,0,0.1)";}}
       onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 1px 12px rgba(0,0,0,0.05)";}}>
       <div style={{position:"relative"}}>
-        <PhotoCarousel photos={plan.photos} fallback={plan.img} height={210} emoji={plan.emoji}/>
+        <PhotoCarousel photos={plan.photos} fallback={plan.image_url || plan.img} height={210} emoji={plan.emoji}/>
         <div style={{position:"absolute",top:12,left:12,background:"rgba(255,255,255,0.88)",backdropFilter:"blur(8px)",borderRadius:20,padding:"4px 11px",fontSize:11,fontWeight:600,color:C.black}}>
           📍 {plan.zone}
         </div>
@@ -660,7 +660,7 @@ function PlanDetail({plan, t, onBack, user, onRequireAuth, go}) {
   return (
     <div style={{minHeight:"100vh",background:C.bg,paddingTop:52,paddingBottom:40}}>
       <div style={{position:"relative"}}>
-        <PhotoCarousel photos={plan.photos} fallback={plan.img} height={280} emoji={plan.emoji}/>
+        <PhotoCarousel photos={plan.photos} fallback={plan.image_url || plan.img} height={280} emoji={plan.emoji}/>
         <button onClick={onBack} style={{position:"absolute",top:16,left:16,background:"rgba(255,255,255,0.9)",backdropFilter:"blur(8px)",border:"none",borderRadius:20,padding:"8px 16px",cursor:"pointer",fontSize:13,fontWeight:600,color:C.black,fontFamily:F}}>← Volver</button>
         <div style={{position:"absolute",bottom:16,left:16,right:16}}>
           <div style={{fontSize:36,marginBottom:6}}>{plan.emoji}</div>
@@ -795,7 +795,7 @@ function UploadModal({t, onClose, user, onUploaded}) {
       stops: stops.filter(s=>s.title.trim()).map(s=>({...s,tag:"Parada",tagColor:"accent"})),
       tips: [tip1,tip2].filter(Boolean),
       photos: photoUrls,
-      img: photoUrls[0]||null,
+      image_url: photoUrls[0]||null,
       author_id: user?.id||null,
       author_name: user?.name||null,
     };
