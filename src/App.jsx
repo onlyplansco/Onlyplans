@@ -796,8 +796,7 @@ function UploadModal({t, onClose, user, onUploaded}) {
       tips: [tip1,tip2].filter(Boolean),
       photos: photoUrls,
       image_url: photoUrls[0]||null,
-      author_id: user?.id||null,
-      author_name: user?.name||null,
+      user_id: user?.id||null,
     };
     const result = await db.submitPlan(planData);
     // Save to myPlans locally regardless of Supabase result
