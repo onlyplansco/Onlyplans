@@ -382,6 +382,30 @@ const db = {
     } catch { return null; }
   },
 
+  async deletePlan(plan, token) {
+    // 1. Borrar imágenes de Storage (no hay FK cascade)
+    const allUrls = [...(Array.isArray(plan.photos) ? plan.photos : []), plan.image_url, plan.img]
+      .filter(u => typeof u === "string" && u.includes("/plan-images/"));
+    const filenames = [...new Set(allUrls.map(u => u.split("/plan-images/")[1]).filter(Boolean))];
+    if (filenames.length > 0) {
+      try {
+        await fetch(`${SUPABASE_URL}/storage/v1/object/plan-images`, {
+          method: "DELETE",
+          headers: { ...this.ah(token), "Content-Type": "application/json" },
+          body: JSON.stringify({ prefixes: filenames }),
+        });
+      } catch {}
+    }
+    // 2. Borrar plan (votes y saved_plans se eliminan por CASCADE automáticamente)
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/plans?id=eq.${plan.id}`, {
+        method: "DELETE",
+        headers: { ...this.ah(token), Prefer: "count=exact" },
+      });
+      return r.ok;
+    } catch { return false; }
+  },
+
   async report(desc) {
     try { await fetch(`${SUPABASE_URL}/rest/v1/incidents`, {method:"POST", headers:this.h, body:JSON.stringify({description:desc})}); } catch {}
   },
@@ -1560,7 +1584,15 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
                       <span style={{fontSize:10,color:C.accentText}}>{p.is_ai_generated?"✦ IA":"📝"}</span>
                     </div>
                   </div>
-                  <button onClick={e=>{e.stopPropagation();db.removeMyPlanLocal(p.id);setMyPlans(db.getMyPlansLocal());}}
+                  <button onClick={async e=>{
+                    e.stopPropagation();
+                    if (!window.confirm("¿Seguro que quieres eliminar este plan? Esta acción no se puede deshacer.")) return;
+                    const ok = await db.deletePlan(p, user.token);
+                    if (ok) {
+                      db.removeMyPlanLocal(p.id);
+                      setMyPlans(prev => prev.filter(x => x.id !== p.id));
+                    }
+                  }}
                     style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,0.5)",border:"none",borderRadius:"50%",width:22,height:22,cursor:"pointer",fontSize:11,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
                 </div>
               ))}
@@ -1671,6 +1703,7 @@ export default function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [user, setUser] = useState(null);
   const [feedKey, setFeedKey] = useState(0); // force feed reload
+  const [profileKey, setProfileKey] = useState(0); // force profile reload
   const t = T[lang];
 
   // Persist lang
@@ -1687,7 +1720,7 @@ export default function App() {
   const requireAuth = () => setShowAuth(true);
   const handleUpload = () => { if(!user){setShowAuth(true);return;} setShowUpload(true); };
   const handleLogout = () => { auth.clear(); setUser(null); };
-  const handleUploaded = () => { setFeedKey(k=>k+1); }; // reload feed after upload
+  const handleUploaded = () => { setFeedKey(k=>k+1); setProfileKey(k=>k+1); }; // reload feed+profile after upload
 
   const handleQuizComplete = async (ans) => {
     setAnswers(ans);
@@ -1752,7 +1785,7 @@ export default function App() {
       {screen==="quiz"&&<QuizScreen t={t} timeData={timeData} onComplete={handleQuizComplete} onBack={()=>go("time")}/>}
       {screen==="loading"&&<LoadingScreen t={t}/>}
       {screen==="generated"&&<GeneratedPlan plan={generatedPlan} answers={answers} t={t} onBack={()=>go("feed")} onRegen={handleRegen} go={go} error={planError} user={user}/>}
-      {screen==="profile"&&<ProfileScreen t={t} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={()=>setShowAuth(true)} user={user} onLogout={handleLogout} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail",{from:"profile"});}}/> }
+      {screen==="profile"&&<ProfileScreen key={profileKey} t={t} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={()=>setShowAuth(true)} user={user} onLogout={handleLogout} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail",{from:"profile"});}}/> }
     </div>
   );
 }
