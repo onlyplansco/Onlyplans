@@ -203,15 +203,18 @@ const db = {
     return sortRandom ? [...result].sort(()=>Math.random()-0.5) : result;
   },
 
-  async submitPlan(data) {
-    try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/plans`, {
-        method:"POST", headers:{...this.h, Prefer:"return=representation"},
-        body: JSON.stringify({...data, is_approved:true, votes_count:0}),
-      });
-      const d = await r.json();
-      return Array.isArray(d) ? d[0] : d;
-    } catch { return null; }
+  async submitPlan(data, token) {
+    const headers = token ? this.ah(token) : this.h;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/plans`, {
+      method:"POST", headers:{...headers, Prefer:"return=representation"},
+      body: JSON.stringify({...data, is_approved:true, votes_count:0}),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(()=>({}));
+      throw new Error(err.message || `Error ${r.status}`);
+    }
+    const d = await r.json();
+    return Array.isArray(d) ? d[0] : d;
   },
 
   async uploadPhoto(file, token) {
@@ -763,6 +766,7 @@ function UploadModal({t, onClose, user, onUploaded}) {
   const [tip2, setTip2] = useState("");
   const [photos, setPhotos] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [publishError, setPublishError] = useState(null);
   const fileRef = useRef();
 
   const vibeOpts = [{v:"naturaleza",l:"Naturaleza 🌿"},{v:"cultura",l:"Cultura 🏛️"},{v:"gastronomia",l:"Gastronomía 🍽️"},{v:"tranquilidad",l:"Tranquilidad 😌"},{v:"aventura",l:"Aventura ⚡"}];
@@ -781,6 +785,7 @@ function UploadModal({t, onClose, user, onUploaded}) {
 
   const handlePublish = async () => {
     setUploading(true);
+    setPublishError(null);
     // Upload photos
     let photoUrls = [];
     for (const p of photos) {
@@ -798,12 +803,16 @@ function UploadModal({t, onClose, user, onUploaded}) {
       image_url: photoUrls[0]||null,
       user_id: user?.id||null,
     };
-    const result = await db.submitPlan(planData);
-    // Save to myPlans locally regardless of Supabase result
-    db.saveMyPlanLocal({...planData, id: result?.id || `my-${Date.now()}`});
-    setUploading(false);
-    setDone(true);
-    if (onUploaded) onUploaded();
+    try {
+      const result = await db.submitPlan(planData, user?.token);
+      db.saveMyPlanLocal({...planData, id: result.id});
+      setUploading(false);
+      setDone(true);
+      if (onUploaded) onUploaded();
+    } catch(e) {
+      setUploading(false);
+      setPublishError(e.message || "No se pudo publicar el plan. Inténtalo de nuevo.");
+    }
   };
 
   const inp = (val) => ({background:C.bg,border:`1.5px solid ${val?C.accent:C.border}`,borderRadius:12,padding:"12px 14px",fontSize:14,color:C.text,outline:"none",fontFamily:F,width:"100%",transition:"border-color 0.2s",boxSizing:"border-box"});
@@ -944,6 +953,7 @@ function UploadModal({t, onClose, user, onUploaded}) {
                 <div style={{background:C.accent+"20",border:`1px solid ${C.accent}`,borderRadius:12,padding:12,fontSize:13,color:C.accentText}}>
                   ✓ Tu plan aparecerá en el feed inmediatamente
                 </div>
+                {publishError&&<div style={{background:"#FEE2E2",border:"1px solid #FCA5A5",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#B91C1C"}}>{publishError}</div>}
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                   <Btn onClick={()=>setStep(4)} variant="ghost">{t.back}</Btn>
                   <Btn onClick={handlePublish} variant="accent" style={{opacity:uploading?0.7:1}}>{uploading?"Subiendo...":t.publish+" ✓"}</Btn>
@@ -1313,14 +1323,22 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
 
   useEffect(()=>{
     setSavedPlans(db.getSavedLocal());
-    setMyPlans(db.getMyPlansLocal());
+    // Load my plans from Supabase when logged in, fallback to localStorage
+    if (user?.id) {
+      fetch(`${SUPABASE_URL}/rest/v1/plans?user_id=eq.${user.id}&order=created_at.desc`, {headers:db.h})
+        .then(r=>r.json())
+        .then(d=>{ setMyPlans(Array.isArray(d)&&d.length>0 ? d : db.getMyPlansLocal()); })
+        .catch(()=>setMyPlans(db.getMyPlansLocal()));
+    } else {
+      setMyPlans(db.getMyPlansLocal());
+    }
     // Load persisted bio/avatar
     try {
       const profile = JSON.parse(localStorage.getItem("op_profile") || "{}");
       if (profile.bio) setBio(profile.bio);
       if (profile.avatar) setAvatar(profile.avatar);
     } catch {}
-  },[]);
+  },[user?.id]);
 
   if (!isLoggedIn) return (
     <div style={{minHeight:"100vh",background:C.bg,paddingTop:52,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"52px 24px 40px"}}>
