@@ -260,6 +260,50 @@ const db = {
     } catch {}
   },
 
+  async savePlan(planId, userId, token) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/saved_plans`, {
+        method: "POST",
+        headers: { ...this.ah(token), Prefer: "return=minimal" },
+        body: JSON.stringify({ user_id: userId, plan_id: planId }),
+      });
+      return r.ok || r.status === 409;
+    } catch { return false; }
+  },
+
+  async unsavePlan(planId, userId, token) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/saved_plans?user_id=eq.${userId}&plan_id=eq.${planId}`, {
+        method: "DELETE",
+        headers: this.ah(token),
+      });
+      return r.ok;
+    } catch { return false; }
+  },
+
+  async getSavedPlans(userId, token) {
+    try {
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/saved_plans?user_id=eq.${userId}&select=plan_id,plans(*)&order=created_at.desc`,
+        { headers: this.ah(token) }
+      );
+      const d = await r.json();
+      if (!Array.isArray(d)) return null;
+      return d.map(row => row.plans).filter(Boolean);
+    } catch { return null; }
+  },
+
+  async checkIsSaved(planId, userId, token) {
+    try {
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/saved_plans?user_id=eq.${userId}&plan_id=eq.${planId}&select=plan_id`,
+        { headers: this.ah(token) }
+      );
+      const d = await r.json();
+      return Array.isArray(d) && d.length > 0;
+    } catch { return false; }
+  },
+
   saveMyPlanLocal(plan) {
     try {
       const existing = JSON.parse(localStorage.getItem("op_my_plans") || "[]");
@@ -416,17 +460,28 @@ function TopNav({screen, go, t, user, onCreatePlan, onUpload}) {
 
 // ── Feed Card ─────────────────────────────────────────────────────────────────
 function FeedCard({plan, t, onClick, user, onRequireAuth}) {
-  const savedList = db.getSavedLocal();
-  const [saved, setSaved] = useState(!!savedList.find(p=>p.id===plan.id));
+  const [saved, setSaved] = useState(() => !!db.getSavedLocal().find(p=>p.id===plan.id));
   const [votes, setVotes] = useState(plan.votes_count||0);
   const [voted, setVoted] = useState(false);
   const budgetL = {low:"Económico",mid:"Normal",high:"Sin límite"};
 
+  useEffect(() => {
+    if (!user?.id || !user?.token) return;
+    db.checkIsSaved(plan.id, user.id, user.token).then(isSaved => setSaved(isSaved));
+  }, [plan.id, user?.id]);
+
   const handleSave = async (e) => {
     e.stopPropagation();
     if (!user) { onRequireAuth(); return; }
-    if (saved) { db.removeSavedLocal(plan.id); setSaved(false); }
-    else { await db.saveToLocal(plan); setSaved(true); }
+    if (saved) {
+      setSaved(false);
+      db.removeSavedLocal(plan.id);
+      db.unsavePlan(plan.id, user.id, user.token);
+    } else {
+      setSaved(true);
+      db.saveToLocal(plan);
+      db.savePlan(plan.id, user.id, user.token);
+    }
   };
 
   return (
@@ -640,24 +695,36 @@ function FeedScreen({t, go, onPlanClick, onUpload, user, onRequireAuth}) {
 
 // ── Plan Detail ───────────────────────────────────────────────────────────────
 function PlanDetail({plan, t, onBack, user, onRequireAuth, go}) {
-  const savedList = db.getSavedLocal();
-  const [saved, setSaved] = useState(!!savedList.find(p=>p.id===plan.id));
+  const [saved, setSaved] = useState(() => !!db.getSavedLocal().find(p=>p.id===plan.id));
   const [reported, setReported] = useState(false);
   const [reportTxt, setReportTxt] = useState("");
   const [showReport, setShowReport] = useState(false);
   const [planDone, setPlanDone] = useState(false);
 
+  useEffect(() => {
+    if (!user?.id || !user?.token) return;
+    db.checkIsSaved(plan.id, user.id, user.token).then(isSaved => setSaved(isSaved));
+  }, [plan.id, user?.id]);
+
   const handleSave = async () => {
     if (!user) { onRequireAuth(); return; }
-    if (saved) { db.removeSavedLocal(plan.id); setSaved(false); }
-    else { await db.saveToLocal(plan); setSaved(true); }
+    if (saved) {
+      setSaved(false);
+      db.removeSavedLocal(plan.id);
+      db.unsavePlan(plan.id, user.id, user.token);
+    } else {
+      setSaved(true);
+      db.saveToLocal(plan);
+      db.savePlan(plan.id, user.id, user.token);
+    }
   };
 
   const handleDoPlan = () => {
     if (!user) { onRequireAuth(); return; }
-    db.saveToLocal(plan);
     setSaved(true);
     setPlanDone(true);
+    db.saveToLocal(plan);
+    db.savePlan(plan.id, user.id, user.token);
   };
 
   return (
@@ -1236,7 +1303,7 @@ function LoadingScreen({t}) {
 }
 
 // ── Generated Plan ────────────────────────────────────────────────────────────
-function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error}) {
+function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error, user}) {
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
@@ -1245,6 +1312,9 @@ function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error}) {
       const planWithId = {...plan, id: plan.id||`gen-${Date.now()}`, is_ai_generated: true};
       db.saveToLocal(planWithId);
       db.saveMyPlanLocal(planWithId);
+      if (user?.id && user?.token && planWithId.id && !planWithId.id.startsWith("gen-")) {
+        db.savePlan(planWithId.id, user.id, user.token);
+      }
     }
   };
 
@@ -1322,7 +1392,18 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
   const avatarRef = useRef();
 
   useEffect(()=>{
-    setSavedPlans(db.getSavedLocal());
+    // Load saved plans from Supabase when logged in, fallback to localStorage
+    if (user?.id && user?.token) {
+      db.getSavedPlans(user.id, user.token).then(plans => {
+        if (plans && plans.length >= 0) {
+          setSavedPlans(plans);
+        } else {
+          setSavedPlans(db.getSavedLocal());
+        }
+      }).catch(() => setSavedPlans(db.getSavedLocal()));
+    } else {
+      setSavedPlans(db.getSavedLocal());
+    }
     // Load my plans from Supabase when logged in, fallback to localStorage
     if (user?.id) {
       fetch(`${SUPABASE_URL}/rest/v1/plans?user_id=eq.${user.id}&order=created_at.desc`, {headers:db.h})
@@ -1450,7 +1531,7 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
                     <div style={{fontSize:13,fontWeight:700,color:C.black,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.title}</div>
                     <div style={{fontSize:11,color:C.muted}}>{p.zone}</div>
                   </div>
-                  <button onClick={e=>{e.stopPropagation();db.removeSavedLocal(p.id);setSavedPlans(db.getSavedLocal());}} style={{background:"transparent",border:"none",color:C.dim,cursor:"pointer",fontSize:18,padding:"4px"}}>×</button>
+                  <button onClick={e=>{e.stopPropagation();db.removeSavedLocal(p.id);if(user?.id&&user?.token)db.unsavePlan(p.id,user.id,user.token);setSavedPlans(prev=>prev.filter(x=>x.id!==p.id));}} style={{background:"transparent",border:"none",color:C.dim,cursor:"pointer",fontSize:18,padding:"4px"}}>×</button>
                 </div>
               ))}
             </div>
@@ -1621,7 +1702,7 @@ export default function App() {
       )}
       {screen==="quiz"&&<QuizScreen t={t} timeData={timeData} onComplete={handleQuizComplete} onBack={()=>go("time")}/>}
       {screen==="loading"&&<LoadingScreen t={t}/>}
-      {screen==="generated"&&<GeneratedPlan plan={generatedPlan} answers={answers} t={t} onBack={()=>go("feed")} onRegen={handleRegen} go={go} error={planError}/>}
+      {screen==="generated"&&<GeneratedPlan plan={generatedPlan} answers={answers} t={t} onBack={()=>go("feed")} onRegen={handleRegen} go={go} error={planError} user={user}/>}
       {screen==="profile"&&<ProfileScreen t={t} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={()=>setShowAuth(true)} user={user} onLogout={handleLogout} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail",{from:"profile"});}}/> }
     </div>
   );
