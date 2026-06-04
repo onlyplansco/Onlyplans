@@ -293,6 +293,38 @@ const db = {
     } catch { return null; }
   },
 
+  async castVote(planId, userId, token) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/votes`, {
+        method: "POST",
+        headers: { ...this.ah(token), Prefer: "resolution=ignore-duplicates,return=minimal" },
+        body: JSON.stringify({ user_id: userId, plan_id: planId }),
+      });
+      return r.ok || r.status === 409;
+    } catch { return false; }
+  },
+
+  async removeVote(planId, userId, token) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/votes?user_id=eq.${userId}&plan_id=eq.${planId}`, {
+        method: "DELETE",
+        headers: this.ah(token),
+      });
+      return r.ok;
+    } catch { return false; }
+  },
+
+  async checkVoted(planId, userId, token) {
+    try {
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/votes?user_id=eq.${userId}&plan_id=eq.${planId}&select=plan_id`,
+        { headers: this.ah(token) }
+      );
+      const d = await r.json();
+      return Array.isArray(d) && d.length > 0;
+    } catch { return false; }
+  },
+
   async checkIsSaved(planId, userId, token) {
     try {
       const r = await fetch(
@@ -468,7 +500,24 @@ function FeedCard({plan, t, onClick, user, onRequireAuth}) {
   useEffect(() => {
     if (!user?.id || !user?.token) return;
     db.checkIsSaved(plan.id, user.id, user.token).then(isSaved => setSaved(isSaved));
+    db.checkVoted(plan.id, user.id, user.token).then(isVoted => {
+      setVoted(isVoted);
+    });
   }, [plan.id, user?.id]);
+
+  const handleVote = (e) => {
+    e.stopPropagation();
+    if (!user) { onRequireAuth(); return; }
+    if (voted) {
+      setVoted(false);
+      setVotes(v => Math.max(0, v - 1));
+      db.removeVote(plan.id, user.id, user.token);
+    } else {
+      setVoted(true);
+      setVotes(v => v + 1);
+      db.castVote(plan.id, user.id, user.token);
+    }
+  };
 
   const handleSave = async (e) => {
     e.stopPropagation();
@@ -508,7 +557,7 @@ function FeedCard({plan, t, onClick, user, onRequireAuth}) {
         </div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div style={{display:"flex",gap:8}}>
-            <button onClick={e=>{e.stopPropagation();setVoted(!voted);setVotes(v=>voted?v-1:v+1);}} style={{background:voted?C.accent:C.bg,border:`1.5px solid ${voted?C.accent:C.border}`,borderRadius:20,padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:700,color:voted?C.accentText:C.muted,transition:"all 0.2s"}}>▲ {votes}</button>
+            <button onClick={handleVote} style={{background:voted?C.accent:C.bg,border:`1.5px solid ${voted?C.accent:C.border}`,borderRadius:20,padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:700,color:voted?C.accentText:C.muted,transition:"all 0.2s"}}>▲ {votes}</button>
             <button onClick={e=>{e.stopPropagation();navigator.share&&navigator.share({title:plan.title,text:plan.subtitle,url:window.location.href});}} style={{background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:20,padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:600,color:C.muted}}>↗ {t.share}</button>
           </div>
           {plan.author_name && <span style={{fontSize:11,color:C.dim}}>por {plan.author_name}</span>}
