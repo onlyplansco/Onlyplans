@@ -148,14 +148,6 @@ const T = {
   }
 };
 
-// ── Mock plans ────────────────────────────────────────────────────────────────
-const MOCK = [
-  { id:"m1", emoji:"⛰️", title:"Amanecer en Montserrat + Viñedos Penedès", subtitle:"Montaña sagrada, vistas únicas y vino de la tierra", zone:"Barcelona · 1h", vibe:"naturaleza", budget:"mid", transport:"yes", votes_count:412, duration:"Día completo", img:"https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80", photos:["https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80","https://images.unsplash.com/photo-1474524955719-b9f87c50ce47?w=800&q=80","https://images.unsplash.com/photo-1510797215324-95aa89f43c33?w=800&q=80"], stops:[{time:"08:00",icon:"🚗",title:"Salida hacia Montserrat",desc:"A-2 dirección Martorell. Aparcamiento en la base del teleférico.",tag:"Viaje",tagColor:"muted"},{time:"09:30",icon:"⛰️",title:"Montserrat",desc:"Sube en teleférico. Visita la Moreneta y haz la ruta Sant Joan. Vistas espectaculares.",tag:"Naturaleza",tagColor:"green"},{time:"13:00",icon:"🍷",title:"Bodega Torres",desc:"Visita guiada con cata incluida. Reserva previa. ~25€/persona.",tag:"Gastronomía",tagColor:"orange"},{time:"15:30",icon:"🌿",title:"Viñedos del Penedès",desc:"Paseo entre viñas. Paisaje precioso en primavera y otoño.",tag:"Naturaleza",tagColor:"green"},{time:"18:00",icon:"🏠",title:"Vuelta a casa",desc:"Por la AP-7. Llegarás antes de las 19:30.",tag:"Viaje",tagColor:"muted"}], tips:["Reserva el teleférico online para evitar colas","La Bodega Torres necesita reserva con antelación"] },
-  { id:"m2", emoji:"🏰", title:"Besalú Medieval + Volcanes de la Garrotxa", subtitle:"Puente románico del s.XII y paisaje volcánico único", zone:"Girona · 1h 30min", vibe:"cultura", budget:"mid", transport:"yes", votes_count:347, duration:"Día completo", img:"https://images.unsplash.com/photo-1555993539-1732b0258235?w=800&q=80", photos:["https://images.unsplash.com/photo-1555993539-1732b0258235?w=800&q=80","https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80"], stops:[{time:"08:30",icon:"🚗",title:"Salida hacia Besalú",desc:"C-17 y N-260. Aparcamiento junto al río Fluvià.",tag:"Viaje",tagColor:"muted"},{time:"10:00",icon:"🏰",title:"Besalú",desc:"Cruza el puente románico del s.XII. Visita el barrio judío y la iglesia de Sant Pere.",tag:"Cultura",tagColor:"accent"},{time:"12:30",icon:"🌋",title:"Volcà del Croscat",desc:"El volcán más joven de la Península. Ruta de 3km muy sencilla.",tag:"Naturaleza",tagColor:"green"},{time:"14:30",icon:"🍽️",title:"Can Jubany",desc:"Restaurante de referencia. Cocina catalana de autor. Reserva imprescindible.",tag:"Restaurante",tagColor:"orange"},{time:"17:00",icon:"🌲",title:"Fageda d'en Jordà",desc:"El hayedo más bonito de Cataluña. 45 min entre hayas centenarias.",tag:"Naturaleza",tagColor:"green"}], tips:["Mejor en otoño para los colores del hayedo","Can Jubany: reserva con semanas de antelación"] },
-  { id:"m3", emoji:"🏙️", title:"Barrio Gótico + Santa Caterina + Barceloneta", subtitle:"Lo mejor de Barcelona en un día sin agobios", zone:"Barcelona · Ciudad", vibe:"cultura", budget:"low", transport:"no", votes_count:289, duration:"Día completo", img:"https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=800&q=80", photos:[], stops:[{time:"10:00",icon:"🚇",title:"Metro Jaume I",desc:"Línea 4 amarilla. Salida directa al Gótico.",tag:"Viaje",tagColor:"muted"},{time:"10:15",icon:"🏛️",title:"Barrio Gótico",desc:"Catedral, Pont del Bisbe, Plaça Reial. 2h sin prisas.",tag:"Cultura",tagColor:"accent"},{time:"12:30",icon:"🛒",title:"Mercat de Santa Caterina",desc:"Sin turistas. Tapa de calamar y vermut. ~10€.",tag:"Gastronomía",tagColor:"orange"},{time:"14:00",icon:"🦞",title:"La Mar Salada",desc:"Arròs negre y mariscos. Terraza con vistas al mar. ~30€.",tag:"Restaurante",tagColor:"orange"},{time:"16:00",icon:"🏖️",title:"Barceloneta",desc:"Paseo marítimo hasta el Port Olímpic.",tag:"Ocio",tagColor:"green"}], tips:["Evita la Barceloneta en agosto","El Mercat de Santa Caterina abre L-S hasta las 15h"] },
-  { id:"m4", emoji:"🏖️", title:"Costa Brava: Calella + Begur + Pals medieval", subtitle:"Calas de roca, castillo medieval y gastronomía de mar", zone:"Girona · 1h 45min", vibe:"naturaleza", budget:"mid", transport:"yes", votes_count:231, duration:"Día completo", img:"https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80", photos:[], stops:[{time:"09:00",icon:"🚗",title:"Salida hacia Calella",desc:"AP-7. Aparcamiento en el pueblo, a pie a las calas.",tag:"Viaje",tagColor:"muted"},{time:"11:00",icon:"🏊",title:"Calas de Calella de Palafrugell",desc:"Aguas cristalinas. Las más bonitas de la Costa Brava.",tag:"Naturaleza",tagColor:"green"},{time:"13:30",icon:"🐟",title:"Sa Riera",desc:"Pescado fresco del día en primera línea de mar.",tag:"Restaurante",tagColor:"orange"},{time:"15:30",icon:"🏰",title:"Begur",desc:"Castillo medieval con vistas al mar.",tag:"Cultura",tagColor:"accent"},{time:"17:00",icon:"🏘️",title:"Pals medieval",desc:"Uno de los pueblos medievales mejor conservados.",tag:"Cultura",tagColor:"accent"}], tips:["Llega antes de las 10h a las calas en verano","Pals es precioso al atardecer"] },
-  { id:"m5", emoji:"🌊", title:"Delta del Ebro + Flamencos + Arroz del Delta", subtitle:"Naturaleza salvaje, flamencos rosas y el mejor arroz", zone:"Tarragona · 2h", vibe:"naturaleza", budget:"low", transport:"yes", votes_count:178, duration:"Día completo", img:"https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800&q=80", photos:[], stops:[{time:"08:00",icon:"🚗",title:"Salida hacia el Delta",desc:"AP-7. Llegada a Deltebre en 2h.",tag:"Viaje",tagColor:"muted"},{time:"10:00",icon:"🦩",title:"Observatorio de flamencos",desc:"Miles de flamencos rosas. Mejor con prismáticos.",tag:"Naturaleza",tagColor:"green"},{time:"12:00",icon:"🚤",title:"Crucero por los canales",desc:"Recorrido en barca. ~15€/persona.",tag:"Actividad",tagColor:"accent"},{time:"14:00",icon:"🍚",title:"L'Algadir del Delta",desc:"El mejor arroz del Delta. ~25€.",tag:"Restaurante",tagColor:"orange"},{time:"16:00",icon:"🌅",title:"Playa del Trabucador",desc:"Lengua de arena entre el mar y la laguna.",tag:"Naturaleza",tagColor:"green"}], tips:["Lleva ropa para el viento","Mejor época: primavera y otoño"] },
-];
 
 const QUESTIONS = [
   { id:"location", emoji:"📍", type:"text" },
@@ -174,33 +166,12 @@ const db = {
     let url = `${SUPABASE_URL}/rest/v1/plans?is_approved=eq.true&order=votes_count.desc&limit=30`;
     const vibeMap = { "Montaña":"naturaleza","Muntanya":"naturaleza","Playa":"naturaleza","Platja":"naturaleza","Pueblos":"cultura","Pobles":"cultura","Ciudad":"cultura","Ciutat":"cultura","Gastronomía":"gastronomia","Gastronomia":"gastronomia","Espectáculos":"aventura","Espectacles":"aventura" };
     if (vibeMap[filter]) url += `&vibe=eq.${vibeMap[filter]}`;
-
-    // Get local user-uploaded plans (non-AI)
-    const localUploaded = (()=>{ try { return JSON.parse(localStorage.getItem("op_my_plans")||"[]").filter(p=>!p.is_ai_generated); } catch { return []; } })();
-
     try {
       const r = await fetch(url, {headers:this.h});
       const d = await r.json();
-      if (Array.isArray(d) && d.length > 0) {
-        // Merge local uploaded plans that aren't already in db results
-        const dbIds = new Set(d.map(p=>p.id));
-        const extras = localUploaded.filter(p=>!dbIds.has(p.id));
-        const merged = [...extras, ...d];
-        return sortRandom ? [...merged].sort(()=>Math.random()-0.5) : merged;
-      }
+      if (Array.isArray(d)) return sortRandom ? [...d].sort(()=>Math.random()-0.5) : d;
     } catch {}
-
-    // Fallback to MOCK + local uploaded
-    let result = [...localUploaded, ...MOCK];
-    if (vibeMap[filter]) {
-      const vibe = vibeMap[filter];
-      result = result.filter(p => p.vibe === vibe);
-    }
-    if (filter === "Playa" || filter === "Platja") result = [...localUploaded.filter(p=>p.vibe==="naturaleza"), ...MOCK.filter(p => p.emoji === "🏖️" || p.title.toLowerCase().includes("costa") || p.title.toLowerCase().includes("delta"))];
-    if (filter === "Montaña" || filter === "Muntanya") result = [...localUploaded.filter(p=>p.vibe==="naturaleza"), ...MOCK.filter(p => p.emoji === "⛰️")];
-    if (filter === "Pueblos" || filter === "Pobles") result = [...localUploaded.filter(p=>p.vibe==="cultura"), ...MOCK.filter(p => p.emoji === "🏰")];
-    if (result.length === 0) result = [...localUploaded, ...MOCK];
-    return sortRandom ? [...result].sort(()=>Math.random()-0.5) : result;
+    return [];
   },
 
   async submitPlan(data, token) {
@@ -334,34 +305,6 @@ const db = {
       const d = await r.json();
       return Array.isArray(d) && d.length > 0;
     } catch { return false; }
-  },
-
-  saveMyPlanLocal(plan) {
-    try {
-      const existing = JSON.parse(localStorage.getItem("op_my_plans") || "[]");
-      if (!existing.find(p => p.id === plan.id)) {
-        existing.unshift({
-          id: plan.id||`gen-${Date.now()}`,
-          title: plan.title, subtitle: plan.subtitle,
-          zone: plan.zone, emoji: plan.emoji, img: plan.img||null,
-          votes_count: 0, stops: plan.stops||[], tips: plan.tips||[],
-          photos: plan.photos||[], vibe: plan.vibe, budget: plan.budget,
-          is_ai_generated: plan.is_ai_generated!==false,
-        });
-        localStorage.setItem("op_my_plans", JSON.stringify(existing.slice(0,50)));
-      }
-    } catch {}
-  },
-
-  getMyPlansLocal() {
-    try { return JSON.parse(localStorage.getItem("op_my_plans") || "[]"); } catch { return []; }
-  },
-
-  removeMyPlanLocal(id) {
-    try {
-      const existing = JSON.parse(localStorage.getItem("op_my_plans") || "[]");
-      localStorage.setItem("op_my_plans", JSON.stringify(existing.filter(p => p.id !== id)));
-    } catch {}
   },
 
   async updateProfile(userId, data, token) {
@@ -688,7 +631,7 @@ function FiltersPanel({t, onClose, onApply, activeFilters}) {
 function FeedScreen({t, go, onPlanClick, onUpload, user, onRequireAuth}) {
   const [filter, setFilter] = useState("all");
   const [sortRandom, setSortRandom] = useState(false);
-  const [plans, setPlans] = useState(MOCK);
+  const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState({});
@@ -945,7 +888,6 @@ function UploadModal({t, onClose, user, onUploaded}) {
     };
     try {
       const result = await db.submitPlan(planData, user?.token);
-      db.saveMyPlanLocal({...planData, id: result.id});
       setUploading(false);
       setDone(true);
       if (onUploaded) onUploaded();
@@ -1376,19 +1318,40 @@ function LoadingScreen({t}) {
 }
 
 // ── Generated Plan ────────────────────────────────────────────────────────────
-function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error, user}) {
+function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error, user, onRequireAuth}) {
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    setSaved(true);
-    if (plan) {
-      const planWithId = {...plan, id: plan.id||`gen-${Date.now()}`, is_ai_generated: true};
-      db.saveToLocal(planWithId);
-      db.saveMyPlanLocal(planWithId);
-      if (user?.id && user?.token && planWithId.id && !planWithId.id.startsWith("gen-")) {
-        db.savePlan(planWithId.id, user.id, user.token);
+  const handleSave = async () => {
+    // Punto 1: usuario no autenticado → solicitar login, no marcar como guardado
+    if (!user) { onRequireAuth(); return; }
+    if (!plan || saving || saved) return;
+    setSaving(true);
+    try {
+      // Valores por defecto seguros para campos opcionales que puede omitir la IA (Punto 3)
+      const planData = {
+        title:     plan.title     || "Plan generado",
+        subtitle:  plan.subtitle  || "",
+        zone:      plan.zone      || "",
+        emoji:     plan.emoji     || "🗺️",
+        vibe:      plan.vibe      || "naturaleza",
+        budget:    plan.budget    || "mid",
+        transport: plan.transport || "yes",
+        stops:     Array.isArray(plan.stops) ? plan.stops : [],
+        tips:      Array.isArray(plan.tips)  ? plan.tips  : [],
+        photos: [], image_url: null,
+        is_ai_generated: true,
+        user_id: user.id,
+      };
+      // Punto 2: solo marcar como guardado si Supabase confirma el INSERT
+      const result = await db.submitPlan(planData, user.token);
+      if (result?.id) {
+        await db.savePlan(result.id, user.id, user.token);
+        db.saveToLocal({...planData, id: result.id});
+        setSaved(true);
       }
-    }
+    } catch {}
+    setSaving(false);
   };
 
   if (error) return (
@@ -1446,7 +1409,7 @@ function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error, user}) {
           </>
         )}
         <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:8}}>
-          <Btn onClick={handleSave} variant={saved?"accent":"black"} style={{width:"100%",padding:"15px",fontSize:15,borderRadius:14}}>{saved?"✓ "+t.saved:t.save+" este plan"}</Btn>
+          <Btn onClick={handleSave} variant={saved?"accent":"black"} style={{width:"100%",padding:"15px",fontSize:15,borderRadius:14,opacity:saving?0.7:1}}>{saved?"✓ "+t.saved:saving?"...":t.save+" este plan"}</Btn>
           <Btn onClick={onRegen} variant="ghost" style={{width:"100%",padding:"14px",borderRadius:14}}>{t.generateNew}</Btn>
           <Btn onClick={()=>go("feed")} variant="ghost" style={{width:"100%",padding:"14px",borderRadius:14}}>Ver más planes →</Btn>
         </div>
@@ -1477,14 +1440,14 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
     } else {
       setSavedPlans(db.getSavedLocal());
     }
-    // Load my plans from Supabase when logged in, fallback to localStorage
+    // Load my plans from Supabase
     if (user?.id) {
       fetch(`${SUPABASE_URL}/rest/v1/plans?user_id=eq.${user.id}&order=created_at.desc`, {headers:db.h})
         .then(r=>r.json())
-        .then(d=>{ setMyPlans(Array.isArray(d)&&d.length>0 ? d : db.getMyPlansLocal()); })
-        .catch(()=>setMyPlans(db.getMyPlansLocal()));
+        .then(d=>{ setMyPlans(Array.isArray(d) ? d : []); })
+        .catch(()=>setMyPlans([]));
     } else {
-      setMyPlans(db.getMyPlansLocal());
+      setMyPlans([]);
     }
     // Load persisted bio/avatar
     try {
@@ -1588,10 +1551,7 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
                     e.stopPropagation();
                     if (!window.confirm("¿Seguro que quieres eliminar este plan? Esta acción no se puede deshacer.")) return;
                     const ok = await db.deletePlan(p, user.token);
-                    if (ok) {
-                      db.removeMyPlanLocal(p.id);
-                      setMyPlans(prev => prev.filter(x => x.id !== p.id));
-                    }
+                    if (ok) setMyPlans(prev => prev.filter(x => x.id !== p.id));
                   }}
                     style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,0.5)",border:"none",borderRadius:"50%",width:22,height:22,cursor:"pointer",fontSize:11,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
                 </div>
@@ -1784,7 +1744,7 @@ export default function App() {
       )}
       {screen==="quiz"&&<QuizScreen t={t} timeData={timeData} onComplete={handleQuizComplete} onBack={()=>go("time")}/>}
       {screen==="loading"&&<LoadingScreen t={t}/>}
-      {screen==="generated"&&<GeneratedPlan plan={generatedPlan} answers={answers} t={t} onBack={()=>go("feed")} onRegen={handleRegen} go={go} error={planError} user={user}/>}
+      {screen==="generated"&&<GeneratedPlan plan={generatedPlan} answers={answers} t={t} onBack={()=>go("feed")} onRegen={handleRegen} go={go} error={planError} user={user} onRequireAuth={requireAuth}/>}
       {screen==="profile"&&<ProfileScreen key={profileKey} t={t} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={()=>setShowAuth(true)} user={user} onLogout={handleLogout} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail",{from:"profile"});}}/> }
     </div>
   );
