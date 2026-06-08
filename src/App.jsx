@@ -716,11 +716,21 @@ function PlanDetail({plan, t, onBack, user, onRequireAuth, go}) {
   const [reportTxt, setReportTxt] = useState("");
   const [showReport, setShowReport] = useState(false);
   const [planDone, setPlanDone] = useState(false);
+  const [authorName, setAuthorName] = useState(plan.author_name||null);
 
   useEffect(() => {
     if (!user?.id || !user?.token) return;
     db.checkIsSaved(plan.id, user.id, user.token).then(isSaved => setSaved(isSaved));
   }, [plan.id, user?.id]);
+
+  // Cargar nombre del autor desde profiles si no está cacheado en el plan
+  useEffect(() => {
+    if (!authorName && plan.user_id) {
+      db.getProfile(plan.user_id).then(profile => {
+        if (profile?.full_name) setAuthorName(profile.full_name);
+      }).catch(()=>{});
+    }
+  }, [plan.user_id]);
 
   const handleSave = async () => {
     if (!user) { onRequireAuth(); return; }
@@ -803,13 +813,13 @@ function PlanDetail({plan, t, onBack, user, onRequireAuth, go}) {
           </div>
         )}
 
-        {plan.author_id && (
-          <div onClick={()=>go("userProfile",{userId:plan.author_id,userName:plan.author_name})} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:14,marginBottom:24,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+        {plan.user_id && (
+          <div onClick={()=>go("userProfile",{userId:plan.user_id,userName:authorName})} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:14,marginBottom:24,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
             <div style={{width:40,height:40,borderRadius:"50%",background:C.accent,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:C.accentText,flexShrink:0}}>
-              {plan.author_avatar ? <img src={plan.author_avatar} style={{width:40,height:40,borderRadius:"50%",objectFit:"cover"}} alt=""/> : (plan.author_name||"U")[0].toUpperCase()}
+              {plan.author_avatar ? <img src={plan.author_avatar} style={{width:40,height:40,borderRadius:"50%",objectFit:"cover"}} alt=""/> : (authorName||"U")[0].toUpperCase()}
             </div>
             <div>
-              <div style={{fontSize:13,fontWeight:700,color:C.black}}>Plan de {plan.author_name||"usuario"}</div>
+              <div style={{fontSize:13,fontWeight:700,color:C.black}}>{authorName ? `Plan de ${authorName}` : "Ver perfil del autor"}</div>
               <div style={{fontSize:11,color:C.muted}}>{t.viewProfile} →</div>
             </div>
           </div>
@@ -1334,7 +1344,7 @@ function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error, user, onRe
         subtitle:  plan.subtitle  || "",
         zone:      plan.zone      || "",
         emoji:     plan.emoji     || "🗺️",
-        vibe:      plan.vibe      || "naturaleza",
+        vibe:      ["relax","aventura","social"].includes(plan.vibe) ? plan.vibe : "social",
         budget:    plan.budget    || "mid",
         transport: plan.transport || "yes",
         stops:     Array.isArray(plan.stops) ? plan.stops : [],
@@ -1599,17 +1609,46 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
 }
 
 // ── User Profile Screen ───────────────────────────────────────────────────────
-function UserProfileScreen({userId, userName, t, onBack}) {
+function UserProfileScreen({userId, userName, t, onBack, onPlanClick}) {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
-  const initial = (userName||"U")[0].toUpperCase();
+  const [displayName, setDisplayName] = useState(userName||null);
 
   useEffect(()=>{
     if (!userId) { setLoading(false); return; }
-    fetch(`${SUPABASE_URL}/rest/v1/plans?author_id=eq.${userId}&is_approved=eq.true&order=votes_count.desc`, {
+
+    // Cargar nombre real desde profiles si author_name no llegó o es genérico
+    if (!userName || userName === "usuario") {
+      db.getProfile(userId).then(profile => {
+        if (profile?.full_name) setDisplayName(profile.full_name);
+      }).catch(()=>{});
+    }
+
+    fetch(`${SUPABASE_URL}/rest/v1/plans?user_id=eq.${userId}&is_approved=eq.true&order=votes_count.desc`, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-    }).then(r=>r.json()).then(d=>{ setPlans(Array.isArray(d)?d:[]); setLoading(false); }).catch(()=>setLoading(false));
+    })
+      .then(r=>r.json())
+      .then(d=>{
+        const list = Array.isArray(d) ? d : [];
+        setPlans(list);
+        // Si aún no tenemos nombre, intentar obtenerlo del primer plan
+        if (!displayName && list.length > 0 && list[0].author_name) {
+          setDisplayName(list[0].author_name);
+        }
+        setLoading(false);
+      })
+      .catch(()=>setLoading(false));
   },[userId]);
+
+  const name = displayName || "Usuario";
+  const initial = name[0].toUpperCase();
+
+  const getPlanImage = (p) => {
+    if (Array.isArray(p.photos) && p.photos.length > 0) return p.photos[0];
+    if (p.image_url) return p.image_url;
+    if (p.img) return p.img;
+    return null;
+  };
 
   return (
     <div style={{minHeight:"100vh",background:C.bg,paddingTop:52,paddingBottom:40}}>
@@ -1618,26 +1657,36 @@ function UserProfileScreen({userId, userName, t, onBack}) {
         <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:24}}>
           <div style={{width:64,height:64,borderRadius:"50%",background:C.accent,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,fontWeight:900,color:C.accentText,fontFamily:F}}>{initial}</div>
           <div>
-            <div style={{fontFamily:F,fontSize:18,fontWeight:900,color:C.black}}>{userName||"Usuario"}</div>
+            <div style={{fontFamily:F,fontSize:18,fontWeight:900,color:C.black}}>{name}</div>
             <div style={{fontSize:12,color:C.muted}}>{plans.length} plan{plans.length!==1?"es":""} publicado{plans.length!==1?"s":""}</div>
           </div>
         </div>
-        <h2 style={{fontFamily:F,fontSize:16,fontWeight:800,color:C.black,marginBottom:16}}>{t.plansByUser} {userName}</h2>
+        <h2 style={{fontFamily:F,fontSize:16,fontWeight:800,color:C.black,marginBottom:16}}>{t.plansByUser} {name}</h2>
         {loading ? (
           <div style={{textAlign:"center",padding:40,color:C.muted}}>Cargando...</div>
         ) : plans.length === 0 ? (
           <div style={{textAlign:"center",padding:40,color:C.muted}}>Este usuario aún no ha publicado planes.</div>
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            {plans.map(p=>(
-              <div key={p.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden"}}>
-                {p.img&&<img src={p.img} alt="" style={{width:"100%",height:140,objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>}
-                <div style={{padding:14}}>
-                  <div style={{fontSize:15,fontWeight:800,color:C.black,fontFamily:F,marginBottom:4}}>{p.title}</div>
-                  <div style={{fontSize:12,color:C.muted}}>📍 {p.zone}</div>
+            {plans.map(p=>{
+              const src = getPlanImage(p);
+              return (
+                <div key={p.id}
+                  onClick={()=>onPlanClick&&onPlanClick(p)}
+                  style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",cursor:onPlanClick?"pointer":"default",transition:"transform 0.2s,box-shadow 0.2s"}}
+                  onMouseEnter={e=>{if(onPlanClick){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 28px rgba(0,0,0,0.1)";}}}
+                  onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="none";}}>
+                  {src
+                    ? <img src={src} alt="" style={{width:"100%",height:140,objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
+                    : <div style={{width:"100%",height:140,background:`linear-gradient(135deg,${C.accent}40,${C.accent}20)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:40}}>{p.emoji||"🗺️"}</div>
+                  }
+                  <div style={{padding:14}}>
+                    <div style={{fontSize:15,fontWeight:800,color:C.black,fontFamily:F,marginBottom:4}}>{p.title}</div>
+                    <div style={{fontSize:12,color:C.muted}}>📍 {p.location_name||p.zone}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -1730,8 +1779,8 @@ export default function App() {
       {screen!=="loading"&&<TopNav screen={screen} go={go} t={t} user={user} onCreatePlan={()=>go("time")} onUpload={handleUpload}/>}
 
       {screen==="feed"&&<FeedScreen key={feedKey} t={t} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail",{from:"feed"});}} onUpload={handleUpload} user={user} onRequireAuth={requireAuth}/>}
-      {screen==="detail"&&selectedPlan&&<PlanDetail plan={selectedPlan} t={t} onBack={()=>go(screenParams.from||"feed")} user={user} onRequireAuth={requireAuth} go={go}/>}
-      {screen==="userProfile"&&<UserProfileScreen userId={screenParams.userId} userName={screenParams.userName} t={t} onBack={()=>go(screenParams.from||"feed")}/>}
+      {screen==="detail"&&selectedPlan&&<PlanDetail plan={selectedPlan} t={t} onBack={()=>{ const from=screenParams.from||"feed"; from==="userProfile"?go("userProfile",{userId:screenParams.userId,userName:screenParams.userName,from:"feed"}):go(from); }} user={user} onRequireAuth={requireAuth} go={go}/>}
+      {screen==="userProfile"&&<UserProfileScreen userId={screenParams.userId} userName={screenParams.userName} t={t} onBack={()=>go(screenParams.from||"feed")} onPlanClick={p=>{setSelectedPlan(p);go("detail",{from:"userProfile",userId:screenParams.userId,userName:screenParams.userName});}}/>}
       {screen==="time"&&(
         <div style={{minHeight:"100vh",background:C.bg,paddingTop:52}}>
           <div style={{padding:"20px 16px"}}>
