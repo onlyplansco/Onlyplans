@@ -717,17 +717,19 @@ function PlanDetail({plan, t, onBack, user, onRequireAuth, go}) {
   const [showReport, setShowReport] = useState(false);
   const [planDone, setPlanDone] = useState(false);
   const [authorName, setAuthorName] = useState(plan.author_name||null);
+  const [authorAvatar, setAuthorAvatar] = useState(plan.author_avatar_url||null);
 
   useEffect(() => {
     if (!user?.id || !user?.token) return;
     db.checkIsSaved(plan.id, user.id, user.token).then(isSaved => setSaved(isSaved));
   }, [plan.id, user?.id]);
 
-  // Cargar nombre del autor desde profiles si no está cacheado en el plan
+  // Cargar nombre y avatar del autor desde profiles si no están cacheados en el plan
   useEffect(() => {
-    if (!authorName && plan.user_id) {
+    if ((!authorName || !authorAvatar) && plan.user_id) {
       db.getProfile(plan.user_id).then(profile => {
-        if (profile?.full_name) setAuthorName(profile.full_name);
+        if (profile?.full_name && !authorName) setAuthorName(profile.full_name);
+        if (profile?.avatar_url && !authorAvatar) setAuthorAvatar(profile.avatar_url);
       }).catch(()=>{});
     }
   }, [plan.user_id]);
@@ -816,7 +818,7 @@ function PlanDetail({plan, t, onBack, user, onRequireAuth, go}) {
         {plan.user_id && (
           <div onClick={()=>go("userProfile",{userId:plan.user_id,userName:authorName})} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:14,marginBottom:24,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
             <div style={{width:40,height:40,borderRadius:"50%",background:C.accent,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:C.accentText,flexShrink:0}}>
-              {plan.author_avatar ? <img src={plan.author_avatar} style={{width:40,height:40,borderRadius:"50%",objectFit:"cover"}} alt=""/> : (authorName||"U")[0].toUpperCase()}
+              {authorAvatar ? <img src={authorAvatar} style={{width:40,height:40,borderRadius:"50%",objectFit:"cover"}} alt=""/> : (authorName||"U")[0].toUpperCase()}
             </div>
             <div>
               <div style={{fontSize:13,fontWeight:700,color:C.black}}>{authorName ? `Plan de ${authorName}` : "Ver perfil del autor"}</div>
@@ -843,217 +845,536 @@ function PlanDetail({plan, t, onBack, user, onRequireAuth, go}) {
   );
 }
 
+// ── Geocoding ─────────────────────────────────────────────────────────────────
+const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
+const COMMUNITY_NORM = {
+  "Catalonia":"Catalunya","Community of Madrid":"Madrid","Madrid":"Madrid",
+  "Andalusia":"Andalucía","Valencian Community":"Comunitat Valenciana",
+  "Basque Country":"País Vasco","Galicia":"Galicia",
+  "Castile and León":"Castilla y León","Castile-La Mancha":"Castilla-La Mancha",
+  "Canary Islands":"Canarias","Aragon":"Aragón","Extremadura":"Extremadura",
+  "Region of Murcia":"Murcia","Balearic Islands":"Illes Balears",
+  "Navarre":"Navarra","Cantabria":"Cantabria","La Rioja":"La Rioja",
+  "Principality of Asturias":"Asturias","Ceuta":"Ceuta","Melilla":"Melilla",
+};
+async function geoSearch(q) {
+  try {
+    const r = await fetch(
+      `${NOMINATIM_URL}?q=${encodeURIComponent(q)}&countrycodes=es&format=json&addressdetails=1&limit=8`,
+      {headers:{"Accept-Language":"es"}}
+    );
+    const data = await r.json();
+    return (Array.isArray(data)?data:[])
+      // Solo entidades de tipo lugar (ciudad, pueblo, municipio) — filtra calles y edificios
+      .filter(item => item.class === "place" || item.class === "boundary" || item.type === "administrative")
+      .map(item=>{
+        const a = item.address||{};
+        const city = a.city||a.town||a.village||a.municipality||a.hamlet||item.name;
+        const province = a.province||a.state_district||null;
+        const community = COMMUNITY_NORM[a.state]||a.state||null;
+        return {
+          label:[city,province,community].filter(Boolean).join(" · "),
+          locationName:city, province, community,
+          lat:parseFloat(item.lat), lon:parseFloat(item.lon),
+        };
+      })
+      .filter(s=>s.locationName)
+      .slice(0,5);
+  } catch { return []; }
+}
+
+// ── Upload options ─────────────────────────────────────────────────────────────
+const CAT_OPTS = [
+  {slug:"montana",    label:"Montaña",      icon:"⛰️"},
+  {slug:"playa",      label:"Playa",        icon:"🏖️"},
+  {slug:"ciudad",     label:"Ciudad",       icon:"🏙️"},
+  {slug:"pueblos",    label:"Pueblos",      icon:"🏡"},
+  {slug:"gastronomia",label:"Gastronomía",  icon:"🍽️"},
+  {slug:"cultura",    label:"Cultura",      icon:"🏛️"},
+  {slug:"ocio",       label:"Ocio",         icon:"🎡"},
+];
+const VIBE_OPTS_UP = [
+  {v:"relax",    l:"Relax",    i:"😌"},
+  {v:"aventura", l:"Aventura", i:"⚡"},
+  {v:"social",   l:"Social",   i:"🎉"},
+];
+const DUR_OPTS = [
+  {v:"unas-horas",    l:"Menos de 4h"},
+  {v:"medio-dia",     l:"Medio día"},
+  {v:"dia-completo",  l:"Día completo"},
+  {v:"fin-de-semana", l:"Fin de semana"},
+  {v:"varios-dias",   l:"Varios días"},
+];
+const BUDGET_OPTS_UP = [
+  {v:"low",  l:"Económico · <30€"},
+  {v:"mid",  l:"Normal · 30–80€"},
+  {v:"high", l:"Premium · >80€"},
+];
+const DIFF_OPTS = [
+  {v:"facil",    l:"🟢 Fácil"},
+  {v:"moderado", l:"🟡 Moderado"},
+  {v:"dificil",  l:"🔴 Difícil"},
+];
+const TAG_LABELS = {
+  "solo":"Solo","pareja":"Pareja","amigos":"Amigos","familia":"Familia",
+  "romantico":"Romántico","familiar":"Familiar",
+  "sin-coche":"Sin coche","con-coche":"Con coche",
+  "transporte-publico":"Transporte público","en-bici":"En bici","moto":"Moto",
+  "senderismo":"Senderismo","ciclismo":"Ciclismo","escalada":"Escalada",
+  "esqui":"Esquí","caiac":"Caiac · Paddle surf","bano":"Baño",
+  "spa":"Spa","piscina":"Piscina","termas":"Termas",
+  "cata-vinos":"Cata de vinos","bodega":"Bodega",
+  "mercado":"Mercado gastronómico","brunch":"Brunch",
+  "museo":"Museo","monumento":"Monumento","castillo":"Castillo",
+  "casco-antiguo":"Casco antiguo","ruta-historica":"Ruta histórica",
+  "con-ninos":"Con niños","pet-friendly":"Pet Friendly",
+  "sin-reserva":"Sin reserva","reserva-necesaria":"Reserva necesaria",
+  "gratuito":"Gratuito","aparcamiento":"Aparcamiento gratuito",
+  "manana":"Mañana","tarde":"Tarde","nocturno":"Nocturno",
+  "todo-el-ano":"Todo el año","verano":"Verano","invierno":"Invierno",
+};
+const TAG_GROUPS = [
+  {id:"grupo",   label:"Grupo",       tags:["solo","pareja","amigos","familia","romantico","familiar"],            limit:4, show:()=>true},
+  {id:"trans",   label:"Transporte",  tags:["sin-coche","con-coche","transporte-publico","en-bici","moto"],        limit:3, show:()=>true},
+  {id:"activ",   label:"Actividades", tags:["senderismo","ciclismo","escalada","esqui","caiac","bano"],            limit:4, show:(cats)=>cats.some(c=>["montana","playa","ocio"].includes(c))},
+  {id:"relax-t", label:"Relax",       tags:["spa","piscina","termas"],                                             limit:3, show:(_,v)=>v==="relax"},
+  {id:"gastro-t",label:"Gastronomía", tags:["cata-vinos","bodega","mercado","brunch"],                             limit:4, show:(cats)=>cats.includes("gastronomia")},
+  {id:"cult-t",  label:"Cultura",     tags:["museo","monumento","castillo","casco-antiguo","ruta-historica"],      limit:4, show:(cats)=>cats.includes("cultura")},
+  {id:"fam-t",   label:"Familia",     tags:["con-ninos","pet-friendly"],                                           limit:2, show:()=>true},
+  {id:"logist",  label:"Logística",   tags:["sin-reserva","reserva-necesaria","gratuito","aparcamiento"],          limit:4, show:()=>true},
+  {id:"hora-t",  label:"Horario",     tags:["manana","tarde","nocturno","todo-el-ano","verano","invierno"],        limit:4, show:()=>true},
+];
+
 // ── Upload Modal ──────────────────────────────────────────────────────────────
 function UploadModal({t, onClose, user, onUploaded}) {
-  const STEPS = 5;
+  const STEPS = 4;
   const [step, setStep] = useState(1);
   const [done, setDone] = useState(false);
-  const [title, setTitle] = useState("");
-  const [subtitle, setSubtitle] = useState("");
-  const [vibes, setVibes] = useState([]);
-  const [budget, setBudget] = useState(null);
-  const [transport, setTransport] = useState(null);
-  const [zone, setZone] = useState("");
-  const [stops, setStops] = useState([{time:"",icon:"📍",title:"",desc:""},{time:"",icon:"🍽️",title:"",desc:""},{time:"",icon:"🏠",title:"",desc:""}]);
-  const [tip1, setTip1] = useState("");
-  const [tip2, setTip2] = useState("");
-  const [photos, setPhotos] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [publishError, setPublishError] = useState(null);
+
+  // Step 1
+  const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
+  const [locationInput, setLocationInput] = useState("");
+  const [geoSugg, setGeoSugg] = useState([]);
+  const [geoStatus, setGeoStatus] = useState("idle"); // idle | loading | found | error
+  const [geoData, setGeoData] = useState(null);
+  const [zone, setZone] = useState("");
+  const geoTimerRef = useRef(null);
+  const scrollRef = useRef(null);
+
+  // Step 2
+  const [categories, setCategories] = useState([]);
+  const [vibe, setVibe] = useState(null);
+  const [durationTypeVal, setDurationTypeVal] = useState(null);
+  const [budget, setBudget] = useState(null);
+  const [diffLevel, setDiffLevel] = useState(null);
+  const [tags, setTags] = useState([]);
+  const [expandedGroups, setExpandedGroups] = useState({});
+
+  // Step 3
+  const [stops, setStops] = useState([
+    {time:"",icon:"📍",title:"",desc:""},
+    {time:"",icon:"🍽️",title:"",desc:""},
+    {time:"",icon:"🏠",title:"",desc:""},
+  ]);
+  const [tips, setTips] = useState(["",""]);
+  const [photos, setPhotos] = useState([]);
   const fileRef = useRef();
 
-  const vibeOpts = [{v:"naturaleza",l:"Naturaleza 🌿"},{v:"cultura",l:"Cultura 🏛️"},{v:"gastronomia",l:"Gastronomía 🍽️"},{v:"tranquilidad",l:"Tranquilidad 😌"},{v:"aventura",l:"Aventura ⚡"}];
-  const budgetOpts = [{v:"low",l:"Económico · <30€"},{v:"mid",l:"Normal · 30-80€"},{v:"high",l:"Sin límite · >80€"}];
+  // ── Geocoding ───────────────────────────────────────────────────────────────
+  const handleLocationInput = (val) => {
+    setLocationInput(val);
+    setGeoData(null);
+    setGeoStatus("idle");
+    setGeoSugg([]);
+    clearTimeout(geoTimerRef.current);
+    if (val.trim().length < 3) return;
+    geoTimerRef.current = setTimeout(async () => {
+      setGeoStatus("loading");
+      const results = await geoSearch(val);
+      setGeoSugg(results);
+      setGeoStatus(results.length > 0 ? "idle" : "error");
+    }, 400);
+  };
 
-  const toggleVibe = (v) => setVibes(p=>p.includes(v)?p.filter(x=>x!==v):[...p,v]);
+  const selectGeoSugg = (s) => {
+    setGeoData(s);
+    setLocationInput(s.locationName);
+    setGeoSugg([]);
+    setGeoStatus("found");
+  };
+
+  // Reset scroll al cambiar de paso
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [step]);
+
+  const clearGeo = () => {
+    setGeoData(null);
+    setLocationInput("");
+    setGeoSugg([]);
+    setGeoStatus("idle");
+  };
+
+  // ── Categories & Tags ───────────────────────────────────────────────────────
+  const toggleCategory = (slug) => {
+    setCategories(prev => prev.includes(slug) ? prev.filter(c=>c!==slug) : [...prev, slug]);
+    if (slug === "montana" && categories.includes("montana")) setDiffLevel(null);
+  };
+  const toggleTagSimple = (slug) => setTags(prev => prev.includes(slug) ? prev.filter(s=>s!==slug) : [...prev, slug]);
+  const toggleGroupExpand = (id) => setExpandedGroups(prev => ({...prev, [id]:!prev[id]}));
+  const visibleGroups = TAG_GROUPS.filter(g => g.show(categories, vibe));
+
+  // ── Stops & Tips ────────────────────────────────────────────────────────────
   const updateStop = (i,f,v) => { const s=[...stops]; s[i]={...s[i],[f]:v}; setStops(s); };
   const addStop = () => setStops([...stops,{time:"",icon:"📍",title:"",desc:""}]);
-  const removeStop = (i) => stops.length>2&&setStops(stops.filter((_,idx)=>idx!==i));
+  const removeStop = (i) => stops.length>1&&setStops(stops.filter((_,idx)=>idx!==i));
+  const updateTip = (i,v) => { const arr=[...tips]; arr[i]=v; setTips(arr); };
+  const addTip = () => tips.length<5&&setTips([...tips,""]);
+  const removeTip = (i) => tips.length>1&&setTips(tips.filter((_,idx)=>idx!==i));
 
   const handlePhotos = (e) => {
     const files = Array.from(e.target.files).slice(0,5);
-    const previews = files.map(f=>({file:f,url:URL.createObjectURL(f)}));
-    setPhotos(previews);
+    setPhotos(files.map(f=>({file:f,url:URL.createObjectURL(f)})));
   };
 
+  // ── Publish ─────────────────────────────────────────────────────────────────
   const handlePublish = async () => {
     setUploading(true);
     setPublishError(null);
-    // Upload photos
     let photoUrls = [];
     for (const p of photos) {
       const url = await db.uploadPhoto(p.file, user?.token);
       if (url) photoUrls.push(url);
     }
     const planData = {
-      title, subtitle, zone,
-      vibe: vibes[0]||"naturaleza",
-      budget, transport, group_type:"amigos",
+      title: title.trim(),
+      subtitle: subtitle.trim()||null,
+      zone: zone.trim()||null,
+      categories,
+      vibe,
+      duration_type: durationTypeVal,
+      tags,
+      difficulty_level: categories.includes("montana") ? diffLevel : null,
+      location_name: geoData?.locationName || locationInput.trim() || null,
+      province: geoData?.province||null,
+      community: geoData?.community||null,
+      lat: geoData?.lat||null,
+      lon: geoData?.lon||null,
+      budget,
+      transport: tags.includes("con-coche")?"yes":tags.includes("sin-coche")?"no":null,
+      group_type: ["pareja","amigos","familia","solo"].find(tg=>tags.includes(tg))||null,
       is_ai_generated: false,
       stops: stops.filter(s=>s.title.trim()).map(s=>({...s,tag:"Parada",tagColor:"accent"})),
-      tips: [tip1,tip2].filter(Boolean),
+      tips: tips.filter(Boolean),
       photos: photoUrls,
       image_url: photoUrls[0]||null,
       user_id: user?.id||null,
+      author_name: user?.name||null,
+      author_avatar_url: user?.avatar||null,
     };
     try {
-      const result = await db.submitPlan(planData, user?.token);
+      await db.submitPlan(planData, user?.token);
       setUploading(false);
       setDone(true);
       if (onUploaded) onUploaded();
     } catch(e) {
       setUploading(false);
-      setPublishError(e.message || "No se pudo publicar el plan. Inténtalo de nuevo.");
+      setPublishError(e.message||"No se pudo publicar el plan. Inténtalo de nuevo.");
     }
   };
 
-  const inp = (val) => ({background:C.bg,border:`1.5px solid ${val?C.accent:C.border}`,borderRadius:12,padding:"12px 14px",fontSize:14,color:C.text,outline:"none",fontFamily:F,width:"100%",transition:"border-color 0.2s",boxSizing:"border-box"});
-  const can1=title.trim().length>3;
-  const can2=vibes.length>0&&budget&&transport&&zone.trim();
-  const can3=stops.filter(s=>s.title.trim()).length>=1;
+  // ── Validation ──────────────────────────────────────────────────────────────
+  const can1 = title.trim().length > 3 && (geoData !== null || locationInput.trim().length > 0);
+  const can2 = durationTypeVal && categories.length > 0 && vibe && budget;
+  const can3 = stops.filter(s=>s.title.trim()).length >= 1;
 
-  const ChipRow = ({label,opts,val,set,multi}) => (
-    <div style={{marginBottom:16}}>
-      <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:0.6,marginBottom:8}}>{label}</div>
-      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-        {opts.map(o=>{const active=multi?val.includes(o.v):val===o.v;return(
-          <button key={o.v} onClick={()=>set(o.v)} style={{background:active?C.black:C.bg,color:active?C.white:C.muted,border:`1.5px solid ${active?C.black:C.border}`,borderRadius:20,padding:"7px 14px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:F,transition:"all 0.15s"}}>{o.l}</button>
-        );})}
-      </div>
-    </div>
+  // ── Style helpers ───────────────────────────────────────────────────────────
+  const inp = (val) => ({
+    background:C.bg, border:`1.5px solid ${val?C.accent:C.border}`,
+    borderRadius:12, padding:"12px 14px", fontSize:14, color:C.text,
+    outline:"none", fontFamily:F, width:"100%", transition:"border-color 0.2s", boxSizing:"border-box",
+  });
+  const SLabel = ({children}) => (
+    <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:0.8,marginBottom:8}}>{children}</div>
   );
+  const Divider = () => <div style={{height:1,background:C.border,margin:"16px 0"}}/>;
+  const Chip = ({active,onClick,children}) => (
+    <button onClick={onClick} style={{
+      background:active?C.black:C.bg, color:active?C.white:C.muted,
+      border:`1.5px solid ${active?C.black:C.border}`,
+      borderRadius:20, padding:"7px 13px", fontSize:13, fontWeight:600,
+      cursor:"pointer", fontFamily:F, transition:"all 0.15s", flexShrink:0,
+    }}>{children}</button>
+  );
+
+  const stepTitles = ["Título y ubicación","Cómo es el plan","El contenido","Revisar y publicar"];
 
   return (
     <div style={{position:"fixed",inset:0,background:C.overlay,zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div style={{background:C.card,borderRadius:"20px 20px 0 0",padding:24,width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-        <div style={{width:36,height:4,background:C.border,borderRadius:2,margin:"0 auto 20px"}}/>
+      <div style={{background:C.card,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
 
-        {done ? (
-          <div style={{textAlign:"center",padding:"20px 0"}}>
-            <div style={{fontSize:56,marginBottom:16}}>🎉</div>
-            <div style={{fontFamily:F,fontSize:22,fontWeight:800,color:C.black,marginBottom:8}}>{t.thanks}</div>
-            <div style={{fontSize:14,color:C.muted,marginBottom:24}}>{t.thanksDesc}</div>
-            <Btn onClick={onClose} variant="black">{t.close}</Btn>
-          </div>
-        ) : (
-          <>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-              <span style={{fontFamily:F,fontSize:18,fontWeight:800,color:C.black}}>{[t.step1,t.step2,t.step3,t.step4,t.step5][step-1]}</span>
+        {/* Header */}
+        <div style={{padding:"16px 24px 0",flexShrink:0}}>
+          <div style={{width:36,height:4,background:C.border,borderRadius:2,margin:"0 auto 14px"}}/>
+          {!done && <>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <span style={{fontFamily:F,fontSize:17,fontWeight:800,color:C.black}}>{stepTitles[step-1]}</span>
               <span style={{fontSize:12,color:C.dim}}>{step}/{STEPS}</span>
             </div>
-            <div style={{height:3,background:C.border,borderRadius:2,marginBottom:20}}>
+            <div style={{height:3,background:C.border,borderRadius:2}}>
               <div style={{height:"100%",width:`${(step/STEPS)*100}%`,background:C.accent,borderRadius:2,transition:"width 0.3s"}}/>
             </div>
+          </>}
+        </div>
 
-            {step===1&&(
-              <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                <div>
-                  <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:0.6,marginBottom:8}}>{t.planTitle}</div>
-                  <input value={title} onChange={e=>setTitle(e.target.value)} placeholder={t.planTitlePh} style={inp(title)}/>
-                </div>
-                <div>
-                  <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:0.6,marginBottom:8}}>{t.planSubtitle}</div>
-                  <input value={subtitle} onChange={e=>setSubtitle(e.target.value)} placeholder={t.planSubPh} style={inp(subtitle)}/>
-                </div>
-                <Btn onClick={()=>can1&&setStep(2)} variant={can1?"black":"ghost"} style={{width:"100%",padding:"14px",borderRadius:14,marginTop:8}}>{t.next}</Btn>
-              </div>
-            )}
+        {/* Scrollable content */}
+        <div ref={scrollRef} style={{overflowY:"auto",padding:"16px 24px 32px",flex:1}}>
 
-            {step===2&&(
-              <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                <ChipRow label={t.planType} opts={vibeOpts} val={vibes} set={toggleVibe} multi/>
-                <ChipRow label={t.budget} opts={budgetOpts} val={budget} set={v=>setBudget(budget===v?null:v)}/>
-                <ChipRow label={t.haveCar} opts={[{v:"yes",l:"Con coche 🚗"},{v:"no",l:"Sin coche 🚇"}]} val={transport} set={v=>setTransport(transport===v?null:v)}/>
-                <div>
-                  <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:0.6,marginBottom:8}}>{t.zone}</div>
-                  <input value={zone} onChange={e=>setZone(e.target.value)} placeholder={t.zonePh} style={inp(zone)}/>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:8}}>
-                  <Btn onClick={()=>setStep(1)} variant="ghost">{t.back}</Btn>
-                  <Btn onClick={()=>can2&&setStep(3)} variant={can2?"black":"ghost"}>{t.next}</Btn>
-                </div>
-              </div>
-            )}
+          {/* Done */}
+          {done && (
+            <div style={{textAlign:"center",padding:"20px 0"}}>
+              <div style={{fontSize:56,marginBottom:16}}>🎉</div>
+              <div style={{fontFamily:F,fontSize:22,fontWeight:800,color:C.black,marginBottom:8}}>{t.thanks}</div>
+              <div style={{fontSize:14,color:C.muted,marginBottom:24}}>{t.thanksDesc}</div>
+              <Btn onClick={onClose} variant="black">{t.close}</Btn>
+            </div>
+          )}
 
-            {step===3&&(
-              <div>
-                <p style={{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.5}}>Mínimo 1 parada. La primera debería ser la salida y la última la vuelta.</p>
-                <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:12}}>
-                  {stops.map((stop,i)=>(
-                    <div key={i} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:14,padding:14}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                        <span style={{fontSize:13,fontWeight:700,color:C.black}}>Parada {i+1}</span>
-                        {stops.length>1&&<button onClick={()=>removeStop(i)} style={{background:"transparent",border:"none",color:C.muted,cursor:"pointer",fontSize:18}}>×</button>}
-                      </div>
-                      <div style={{display:"grid",gridTemplateColumns:"70px 1fr",gap:8,marginBottom:8}}>
-                        <input value={stop.time} onChange={e=>updateStop(i,"time",e.target.value)} placeholder="10:00" style={{...inp(stop.time),padding:"10px 10px"}}/>
-                        <input value={stop.title} onChange={e=>updateStop(i,"title",e.target.value)} placeholder={t.stopName} style={{...inp(stop.title),padding:"10px 12px"}}/>
-                      </div>
-                      <textarea value={stop.desc} onChange={e=>updateStop(i,"desc",e.target.value)} placeholder={t.stopDesc} style={{...inp(stop.desc),minHeight:60,resize:"none",padding:"10px 12px"}}/>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={addStop} style={{background:"transparent",border:`1.5px dashed ${C.border}`,borderRadius:12,padding:"12px",width:"100%",fontSize:13,fontWeight:600,color:C.muted,cursor:"pointer",fontFamily:F,marginBottom:12}}>{t.addStop}</button>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                  <Btn onClick={()=>setStep(2)} variant="ghost">{t.back}</Btn>
-                  <Btn onClick={()=>can3&&setStep(4)} variant={can3?"black":"ghost"}>{t.next}</Btn>
-                </div>
-              </div>
-            )}
+          {/* ── PASO 1 ── */}
+          {!done && step===1 && (
+            <div style={{display:"flex",flexDirection:"column",gap:0}}>
+              <SLabel>Título del plan *</SLabel>
+              <input value={title} onChange={e=>setTitle(e.target.value)}
+                placeholder="Ej: Amanecer en Montserrat + Viñedos Penedès"
+                style={{...inp(title),marginBottom:14}}/>
 
-            {step===4&&(
-              <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                <p style={{fontSize:13,color:C.muted,lineHeight:1.5}}>Consejos prácticos que no están en Google. Opcionales pero muy valorados.</p>
-                <input value={tip1} onChange={e=>setTip1(e.target.value)} placeholder={t.tip1Ph} style={inp(tip1)}/>
-                <input value={tip2} onChange={e=>setTip2(e.target.value)} placeholder={t.tip2Ph} style={inp(tip2)}/>
+              <SLabel>Subtítulo · <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>Opcional</span></SLabel>
+              <input value={subtitle} onChange={e=>setSubtitle(e.target.value)}
+                placeholder="Ej: Montaña sagrada, vistas únicas y vino de la tierra"
+                style={{...inp(subtitle),marginBottom:14}}/>
 
-                <div style={{background:C.bg,border:`1.5px dashed ${C.border}`,borderRadius:14,padding:18,textAlign:"center"}}>
-                  <div style={{fontSize:28,marginBottom:8}}>📸</div>
-                  <div style={{fontSize:14,fontWeight:700,color:C.black,marginBottom:4}}>{t.addPhotos}</div>
-                  <div style={{fontSize:12,color:C.muted,marginBottom:12}}>{t.photosDesc}</div>
-                  <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={handlePhotos}/>
-                  <button onClick={()=>fileRef.current.click()} style={{background:C.accent,color:C.accentText,border:"none",borderRadius:10,padding:"8px 20px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>
-                    {photos.length>0?`✓ ${photos.length} foto${photos.length>1?"s":""} seleccionada${photos.length>1?"s":""}`:t.addPhotos}
-                  </button>
-                  {photos.length>0&&(
-                    <div style={{display:"flex",gap:8,marginTop:12,overflowX:"auto"}}>
-                      {photos.map((p,i)=><img key={i} src={p.url} style={{width:60,height:60,borderRadius:8,objectFit:"cover",flexShrink:0}} alt=""/>)}
-                    </div>
-                  )}
-                </div>
-
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                  <Btn onClick={()=>setStep(3)} variant="ghost">{t.back}</Btn>
-                  <Btn onClick={()=>setStep(5)} variant="black">{t.next}</Btn>
-                </div>
-              </div>
-            )}
-
-            {step===5&&(
-              <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                <div style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:14,padding:16}}>
-                  <div style={{fontSize:16,fontWeight:800,color:C.black,marginBottom:4,fontFamily:F}}>{title}</div>
-                  {subtitle&&<div style={{fontSize:13,color:C.muted,marginBottom:8}}>{subtitle}</div>}
-                  <div style={{fontSize:12,color:C.muted,marginBottom:8}}>📍 {zone}</div>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
-                    {vibes.map(v=><span key={v} style={{fontSize:11,fontWeight:700,color:C.tagGreen.t,background:C.tagGreen.b,padding:"3px 9px",borderRadius:20,textTransform:"uppercase"}}>{vibeOpts.find(o=>o.v===v)?.l}</span>)}
-                    {budget&&<span style={{fontSize:11,fontWeight:700,color:C.tagMuted.t,background:C.tagMuted.b,padding:"3px 9px",borderRadius:20,textTransform:"uppercase"}}>{budgetOpts.find(o=>o.v===budget)?.l}</span>}
-                    {transport&&<span style={{fontSize:11,fontWeight:700,color:C.tagAccent.t,background:C.tagAccent.b,padding:"3px 9px",borderRadius:20,textTransform:"uppercase"}}>{transport==="yes"?"Con coche 🚗":"Sin coche 🚇"}</span>}
+              <SLabel>Ubicación principal *</SLabel>
+              <div style={{position:"relative",marginBottom:4}}>
+                {geoStatus==="found" ? (
+                  <div style={{display:"flex",alignItems:"center",gap:8,background:"#D6F0E0",border:"1.5px solid #1D6334",borderRadius:12,padding:"11px 14px"}}>
+                    <span style={{fontSize:14,color:"#1D6334",fontWeight:600,flex:1}}>✅ {geoData?.label}</span>
+                    <button onClick={clearGeo} style={{background:"transparent",border:"none",color:"#1D6334",cursor:"pointer",fontSize:18,lineHeight:1}}>×</button>
                   </div>
-                  <div style={{fontSize:12,color:C.muted}}>{stops.filter(s=>s.title).length} paradas · {[tip1,tip2].filter(Boolean).length} consejos · {photos.length} fotos</div>
+                ) : (
+                  <>
+                    <input value={locationInput} onChange={e=>handleLocationInput(e.target.value)}
+                      placeholder="Ej: Ripoll, Montserrat, Madrid, Valencia..."
+                      style={inp(locationInput)}/>
+                    {geoStatus==="loading" && (
+                      <div style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",fontSize:12,color:C.muted}}>Buscando...</div>
+                    )}
+                  </>
+                )}
+                {geoSugg.length>0 && geoStatus!=="found" && (
+                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",zIndex:10,overflow:"hidden",marginTop:4}}>
+                    {geoSugg.map((s,i)=>(
+                      <div key={i} onMouseDown={()=>selectGeoSugg(s)}
+                        style={{padding:"10px 14px",fontSize:13,color:C.text,cursor:"pointer",borderBottom:i<geoSugg.length-1?`1px solid ${C.border}`:"none"}}
+                        onMouseEnter={e=>e.currentTarget.style.background=C.bg}
+                        onMouseLeave={e=>e.currentTarget.style.background=C.card}>
+                        📍 {s.label}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {geoStatus==="error" && locationInput.length>=3 && (
+                <div style={{fontSize:12,color:"#B91C1C",marginBottom:8,background:"#FEE2E2",borderRadius:8,padding:"6px 10px"}}>
+                  No hemos encontrado esa ubicación. Prueba con la ciudad más cercana.
                 </div>
-                <div style={{background:C.accent+"20",border:`1px solid ${C.accent}`,borderRadius:12,padding:12,fontSize:13,color:C.accentText}}>
-                  ✓ Tu plan aparecerá en el feed inmediatamente
+              )}
+              <div style={{fontSize:12,color:C.muted,marginBottom:14}}>Coordenadas y provincia se obtienen automáticamente.</div>
+
+              <SLabel>¿El plan pasa por varios lugares? · <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>Opcional</span></SLabel>
+              <input value={zone} onChange={e=>setZone(e.target.value)}
+                placeholder="Ej: Ripoll · Queralbs · Vall de Núria"
+                style={{...inp(zone),marginBottom:6}}/>
+              <div style={{fontSize:12,color:C.muted,marginBottom:16}}>Solo para mostrar en la tarjeta.</div>
+
+              <Btn onClick={()=>can1&&setStep(2)} variant={can1?"black":"ghost"} style={{width:"100%",padding:"14px",borderRadius:14}}>
+                Continuar →
+              </Btn>
+            </div>
+          )}
+
+          {/* ── PASO 2 ── */}
+          {!done && step===2 && (
+            <div>
+              <SLabel>Duración *</SLabel>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {DUR_OPTS.map(o=><Chip key={o.v} active={durationTypeVal===o.v} onClick={()=>setDurationTypeVal(durationTypeVal===o.v?null:o.v)}>{o.l}</Chip>)}
+              </div>
+
+              <Divider/>
+
+              <SLabel>Categorías * · <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>Elige las que mejor describan el plan</span></SLabel>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {CAT_OPTS.map(o=><Chip key={o.slug} active={categories.includes(o.slug)} onClick={()=>toggleCategory(o.slug)}>{o.icon} {o.label}</Chip>)}
+              </div>
+              {categories.includes("montana") && (
+                <div style={{marginTop:12}}>
+                  <div style={{fontSize:12,color:C.muted,marginBottom:8}}>⛰️ Dificultad · Opcional</div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    {DIFF_OPTS.map(o=><Chip key={o.v} active={diffLevel===o.v} onClick={()=>setDiffLevel(diffLevel===o.v?null:o.v)}>{o.l}</Chip>)}
+                  </div>
                 </div>
-                {publishError&&<div style={{background:"#FEE2E2",border:"1px solid #FCA5A5",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#B91C1C"}}>{publishError}</div>}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                  <Btn onClick={()=>setStep(4)} variant="ghost">{t.back}</Btn>
-                  <Btn onClick={handlePublish} variant="accent" style={{opacity:uploading?0.7:1}}>{uploading?"Subiendo...":t.publish+" ✓"}</Btn>
+              )}
+
+              <Divider/>
+
+              <SLabel>Vibe *</SLabel>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {VIBE_OPTS_UP.map(o=><Chip key={o.v} active={vibe===o.v} onClick={()=>setVibe(vibe===o.v?null:o.v)}>{o.i} {o.l}</Chip>)}
+              </div>
+
+              <Divider/>
+
+              <SLabel>Presupuesto *</SLabel>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {BUDGET_OPTS_UP.map(o=><Chip key={o.v} active={budget===o.v} onClick={()=>setBudget(budget===o.v?null:o.v)}>{o.l}</Chip>)}
+              </div>
+
+              <Divider/>
+
+              {/* Tags section */}
+              <div style={{background:C.bg,borderRadius:14,padding:"14px 16px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <span style={{fontSize:13,fontWeight:700,color:C.black}}>Tags · <span style={{color:C.muted,fontWeight:500}}>Opcional</span></span>
+                  {tags.length>0&&<span style={{fontSize:12,color:C.accentText,fontWeight:700,background:C.accent+"30",padding:"2px 8px",borderRadius:10}}>{tags.length} seleccionados</span>}
+                </div>
+                {visibleGroups.map(g=>{
+                  const expanded = expandedGroups[g.id];
+                  const shown = expanded ? g.tags : g.tags.slice(0,g.limit);
+                  const hasMore = g.tags.length > g.limit;
+                  return (
+                    <div key={g.id} style={{marginBottom:12}}>
+                      <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:0.6,marginBottom:6}}>{g.label}</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {shown.map(tag=>(
+                          <button key={tag} onClick={()=>toggleTagSimple(tag)} style={{
+                            background:tags.includes(tag)?C.accent:C.card,
+                            color:tags.includes(tag)?C.accentText:C.muted,
+                            border:`1.5px solid ${tags.includes(tag)?C.accent:C.border}`,
+                            borderRadius:20,padding:"5px 11px",fontSize:12,fontWeight:600,
+                            cursor:"pointer",fontFamily:F,transition:"all 0.15s",
+                          }}>{TAG_LABELS[tag]||tag}</button>
+                        ))}
+                        {hasMore&&(
+                          <button onClick={()=>toggleGroupExpand(g.id)} style={{
+                            background:"transparent",border:`1.5px dashed ${C.border}`,
+                            borderRadius:20,padding:"5px 11px",fontSize:12,color:C.dim,cursor:"pointer",fontFamily:F,
+                          }}>{expanded?`Ver menos`:`+ ${g.tags.length-g.limit} más`}</button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:16}}>
+                <Btn onClick={()=>setStep(1)} variant="ghost">{t.back}</Btn>
+                <Btn onClick={()=>can2&&setStep(3)} variant={can2?"black":"ghost"}>{t.next}</Btn>
+              </div>
+            </div>
+          )}
+
+          {/* ── PASO 3 ── */}
+          {!done && step===3 && (
+            <div>
+              <p style={{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.5}}>Mínimo 1 parada. La primera suele ser la salida y la última la vuelta.</p>
+              <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:12}}>
+                {stops.map((stop,i)=>(
+                  <div key={i} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:14,padding:14}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                      <span style={{fontSize:13,fontWeight:700,color:C.black}}>Parada {i+1}</span>
+                      {stops.length>1&&<button onClick={()=>removeStop(i)} style={{background:"transparent",border:"none",color:C.muted,cursor:"pointer",fontSize:18}}>×</button>}
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"70px 1fr",gap:8,marginBottom:8}}>
+                      <input value={stop.time} onChange={e=>updateStop(i,"time",e.target.value)} placeholder="10:00" style={{...inp(stop.time),padding:"10px 10px"}}/>
+                      <input value={stop.title} onChange={e=>updateStop(i,"title",e.target.value)} placeholder={t.stopName} style={{...inp(stop.title),padding:"10px 12px"}}/>
+                    </div>
+                    <textarea value={stop.desc} onChange={e=>updateStop(i,"desc",e.target.value)} placeholder={t.stopDesc} style={{...inp(stop.desc),minHeight:60,resize:"none",padding:"10px 12px"}}/>
+                  </div>
+                ))}
+              </div>
+              <button onClick={addStop} style={{background:"transparent",border:`1.5px dashed ${C.border}`,borderRadius:12,padding:"12px",width:"100%",fontSize:13,fontWeight:600,color:C.muted,cursor:"pointer",fontFamily:F,marginBottom:20}}>{t.addStop}</button>
+
+              <SLabel>Consejos · <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>Opcional</span></SLabel>
+              <p style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.5}}>Lo que no está en Google pero marca la diferencia.</p>
+              <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
+                {tips.map((tip,i)=>(
+                  <div key={i} style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <input value={tip} onChange={e=>updateTip(i,e.target.value)}
+                      placeholder={`Consejo ${i+1} · Ej: Reserva el teleférico online`}
+                      style={{...inp(tip),flex:1}}/>
+                    {tips.length>1&&<button onClick={()=>removeTip(i)} style={{background:"transparent",border:"none",color:C.muted,cursor:"pointer",fontSize:18,flexShrink:0}}>×</button>}
+                  </div>
+                ))}
+              </div>
+              {tips.length<5&&<button onClick={addTip} style={{background:"transparent",border:`1.5px dashed ${C.border}`,borderRadius:10,padding:"8px",width:"100%",fontSize:12,color:C.dim,cursor:"pointer",fontFamily:F,marginBottom:16}}>+ Añadir consejo</button>}
+
+              <SLabel>Fotos · <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>Opcional</span></SLabel>
+              <div style={{background:C.bg,border:`1.5px dashed ${C.border}`,borderRadius:14,padding:16,textAlign:"center",marginBottom:8}}>
+                <div style={{fontSize:24,marginBottom:6}}>📸</div>
+                <div style={{fontSize:12,color:C.muted,marginBottom:10}}>{t.photosDesc}</div>
+                <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={handlePhotos}/>
+                <button onClick={()=>fileRef.current.click()} style={{background:C.accent,color:C.accentText,border:"none",borderRadius:10,padding:"8px 20px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F}}>
+                  {photos.length>0?`✓ ${photos.length} foto${photos.length>1?"s":""}`:t.addPhotos}
+                </button>
+                {photos.length>0&&(
+                  <div style={{display:"flex",gap:8,marginTop:12,overflowX:"auto",justifyContent:"center"}}>
+                    {photos.map((p,i)=><img key={i} src={p.url} style={{width:56,height:56,borderRadius:8,objectFit:"cover",flexShrink:0}} alt=""/>)}
+                  </div>
+                )}
+              </div>
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:16}}>
+                <Btn onClick={()=>setStep(2)} variant="ghost">{t.back}</Btn>
+                <Btn onClick={()=>can3&&setStep(4)} variant={can3?"black":"ghost"}>{t.next}</Btn>
+              </div>
+            </div>
+          )}
+
+          {/* ── PASO 4 ── */}
+          {!done && step===4 && (
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:14,padding:16}}>
+                <div style={{fontSize:16,fontWeight:800,color:C.black,marginBottom:4,fontFamily:F}}>{title}</div>
+                {subtitle&&<div style={{fontSize:13,color:C.muted,marginBottom:8}}>{subtitle}</div>}
+                <div style={{fontSize:12,color:C.muted,marginBottom:2}}>📍 {geoData?.label||locationInput}</div>
+                {zone&&<div style={{fontSize:12,color:C.muted,marginBottom:8}}>🗺️ {zone}</div>}
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",margin:"10px 0"}}>
+                  {categories.map(c=>{const o=CAT_OPTS.find(x=>x.slug===c); return o?<span key={c} style={{fontSize:11,fontWeight:700,color:C.tagGreen.t,background:C.tagGreen.b,padding:"3px 9px",borderRadius:20}}>{o.icon} {o.label}</span>:null;})}
+                  {vibe&&<span style={{fontSize:11,fontWeight:700,color:C.tagAccent.t,background:C.tagAccent.b,padding:"3px 9px",borderRadius:20}}>{VIBE_OPTS_UP.find(o=>o.v===vibe)?.i} {VIBE_OPTS_UP.find(o=>o.v===vibe)?.l}</span>}
+                  {durationTypeVal&&<span style={{fontSize:11,fontWeight:700,color:C.tagMuted.t,background:C.tagMuted.b,padding:"3px 9px",borderRadius:20}}>{DUR_OPTS.find(o=>o.v===durationTypeVal)?.l}</span>}
+                  {budget&&<span style={{fontSize:11,fontWeight:700,color:C.tagMuted.t,background:C.tagMuted.b,padding:"3px 9px",borderRadius:20}}>{BUDGET_OPTS_UP.find(o=>o.v===budget)?.l}</span>}
+                </div>
+                {tags.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>{tags.map(tag=><span key={tag} style={{fontSize:10,fontWeight:600,color:C.muted,background:C.border,padding:"2px 8px",borderRadius:20}}>{TAG_LABELS[tag]||tag}</span>)}</div>}
+                {diffLevel&&categories.includes("montana")&&<div style={{fontSize:12,color:C.muted,marginBottom:4}}>⛰️ {DIFF_OPTS.find(o=>o.v===diffLevel)?.l}</div>}
+                <div style={{fontSize:12,color:C.muted}}>
+                  {stops.filter(s=>s.title).length} parada{stops.filter(s=>s.title).length!==1?"s":""} · {tips.filter(Boolean).length} consejo{tips.filter(Boolean).length!==1?"s":""} · {photos.length} foto{photos.length!==1?"s":""}
                 </div>
               </div>
-            )}
-          </>
-        )}
+              <div style={{background:C.accent+"20",border:`1px solid ${C.accent}`,borderRadius:12,padding:12,fontSize:13,color:C.accentText}}>
+                ✓ Tu plan aparecerá en el feed inmediatamente
+              </div>
+              {publishError&&<div style={{background:"#FEE2E2",border:"1px solid #FCA5A5",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#B91C1C"}}>{publishError}</div>}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <Btn onClick={()=>setStep(3)} variant="ghost">{t.back}</Btn>
+                <Btn onClick={handlePublish} variant="accent" style={{opacity:uploading?0.7:1}}>{uploading?"Subiendo...":"Publicar plan ✓"}</Btn>
+              </div>
+            </div>
+          )}
+
+        </div>
       </div>
     </div>
   );
