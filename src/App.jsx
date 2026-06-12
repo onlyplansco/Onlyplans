@@ -24,7 +24,7 @@ const T = {
     createPlan: "Crear mi plan", uploadPlan: "+ Subir plan",
     subtitle: "Descubre planes cerca de ti o crea los tuyos con IA.",
     topVoted: "Más votados", random: "Aleatorio",
-    cats: ["Montaña","Playa","Ciudad","Pueblos","Espectáculos","Gastronomía"],
+    cats: ["Montaña","Playa","Ciudad","Pueblos","Gastronomía","Cultura","Ocio"],
     filters: "Filtros", save: "Guardar", saved: "Guardado ✓",
     share: "Compartir", doPlan: "Hacer este plan",
     generateNew: "Generar otro plan", planDay: "El plan del día",
@@ -72,22 +72,32 @@ const T = {
     editProfile: "Editar perfil", saveProfile: "Guardar cambios",
     viewProfile: "Ver perfil", plansByUser: "Planes de",
     distanceFilter: "Distancia", durationFilter: "Duración",
-    budgetFilter: "Presupuesto", transportFilter: "Transporte",
-    groupFilter: "Grupo", applyFilters: "Aplicar filtros",
+    budgetFilter: "Presupuesto", vibeFilter: "Ambiente",
+    groupFilter: "Grupo", transportFilter: "Transporte",
+    applyFilters: "Aplicar filtros",
     clearFilters: "Limpiar filtros",
     distOpts: ["10 km","30 km","50 km","100 km","Sin límite"],
-    durOpts: ["Mañana","Tarde","Día completo","Fin de semana"],
-    budgetOpts: ["Económico","Normal","Sin límite"],
-    transportOpts: ["Con coche","Sin coche"],
-    groupOpts: ["Pareja","Amigos","Familia","Solo"],
+    durOpts: ["Unas horas","Medio día","Día completo","Fin de semana","Varios días"],
+    durVals: ["unas-horas","medio-dia","dia-completo","fin-de-semana","varios-dias"],
+    budgetOpts: ["Económico","Normal","Premium"],
+    budgetVals: ["low","mid","high"],
+    vibeOpts: ["Relax","Aventura","Social"],
+    vibeVals: ["relax","aventura","social"],
+    groupOpts: ["Solo","Pareja","Amigos","Familia"],
+    groupVals: ["solo","pareja","amigos","familia"],
+    transportOpts: ["Sin coche","Con coche"],
+    transportVals: ["sin-coche","con-coche"],
     locationNeeded: "Activa tu ubicación para filtrar por distancia",
     allowLocation: "Permitir",
+    durTypes: {"unas-horas":"Unas horas","medio-dia":"Medio día","dia-completo":"Día completo","fin-de-semana":"Fin de semana","varios-dias":"Varios días"},
+    vibeLabels: {"relax":"Relax","aventura":"Aventura","social":"Social"},
+    catLabels: {"montana":"Montaña","playa":"Playa","ciudad":"Ciudad","pueblos":"Pueblos","gastronomia":"Gastronomía","cultura":"Cultura","ocio":"Ocio"},
   },
   ca: {
     createPlan: "Crear el meu pla", uploadPlan: "+ Pujar pla",
     subtitle: "Descobreix plans a prop teu o crea els teus amb IA.",
     topVoted: "Més votats", random: "Aleatori",
-    cats: ["Muntanya","Platja","Ciutat","Pobles","Espectacles","Gastronomia"],
+    cats: ["Muntanya","Platja","Ciutat","Pobles","Gastronomia","Cultura","Lleure"],
     filters: "Filtres", save: "Guardar", saved: "Guardat ✓",
     share: "Compartir", doPlan: "Fer aquest pla",
     generateNew: "Generar un altre pla", planDay: "El pla del dia",
@@ -135,16 +145,26 @@ const T = {
     editProfile: "Editar perfil", saveProfile: "Desar canvis",
     viewProfile: "Veure perfil", plansByUser: "Plans de",
     distanceFilter: "Distància", durationFilter: "Durada",
-    budgetFilter: "Pressupost", transportFilter: "Transport",
-    groupFilter: "Grup", applyFilters: "Aplicar filtres",
+    budgetFilter: "Pressupost", vibeFilter: "Ambient",
+    groupFilter: "Grup", transportFilter: "Transport",
+    applyFilters: "Aplicar filtres",
     clearFilters: "Netejar filtres",
     distOpts: ["10 km","30 km","50 km","100 km","Sense límit"],
-    durOpts: ["Matí","Tarda","Dia complet","Cap de setmana"],
-    budgetOpts: ["Econòmic","Normal","Sense límit"],
-    transportOpts: ["Amb cotxe","Sense cotxe"],
-    groupOpts: ["Parella","Amics","Família","Sol"],
+    durOpts: ["Unes hores","Mig dia","Dia complet","Cap de setmana","Diversos dies"],
+    durVals: ["unas-horas","medio-dia","dia-completo","fin-de-semana","varios-dias"],
+    budgetOpts: ["Econòmic","Normal","Premium"],
+    budgetVals: ["low","mid","high"],
+    vibeOpts: ["Relax","Aventura","Social"],
+    vibeVals: ["relax","aventura","social"],
+    groupOpts: ["Sol","Parella","Amics","Família"],
+    groupVals: ["solo","pareja","amigos","familia"],
+    transportOpts: ["Sense cotxe","Amb cotxe"],
+    transportVals: ["sin-coche","con-coche"],
     locationNeeded: "Activa la teva ubicació per filtrar per distància",
     allowLocation: "Permetre",
+    durTypes: {"unas-horas":"Unes hores","medio-dia":"Mig dia","dia-completo":"Dia complet","fin-de-semana":"Cap de setmana","varios-dias":"Diversos dies"},
+    vibeLabels: {"relax":"Relax","aventura":"Aventura","social":"Social"},
+    catLabels: {"montana":"Muntanya","playa":"Platja","ciudad":"Ciutat","pueblos":"Pobles","gastronomia":"Gastronomia","cultura":"Cultura","ocio":"Lleure"},
   }
 };
 
@@ -162,10 +182,28 @@ const db = {
   h: { apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}`, "Content-Type":"application/json" },
   ah: (t) => ({ apikey:SUPABASE_KEY, Authorization:`Bearer ${t}`, "Content-Type":"application/json" }),
 
-  async getPlans(filter="all", sortRandom=false) {
-    let url = `${SUPABASE_URL}/rest/v1/plans?is_approved=eq.true&order=votes_count.desc&limit=30`;
-    const vibeMap = { "Montaña":"naturaleza","Muntanya":"naturaleza","Playa":"naturaleza","Platja":"naturaleza","Pueblos":"cultura","Pobles":"cultura","Ciudad":"cultura","Ciutat":"cultura","Gastronomía":"gastronomia","Gastronomia":"gastronomia","Espectáculos":"aventura","Espectacles":"aventura" };
-    if (vibeMap[filter]) url += `&vibe=eq.${vibeMap[filter]}`;
+  async getPlans(filter="all", advFilters={}, sortRandom=false) {
+    let url = `${SUPABASE_URL}/rest/v1/plans?is_approved=eq.true&order=votes_count.desc&limit=50`;
+
+    // Filtro de categoría (barra rápida del feed)
+    const catMap = {
+      "Montaña":"montana",     "Muntanya":"montana",
+      "Playa":"playa",         "Platja":"playa",
+      "Ciudad":"ciudad",       "Ciutat":"ciudad",
+      "Pueblos":"pueblos",     "Pobles":"pueblos",
+      "Gastronomía":"gastronomia", "Gastronomia":"gastronomia",
+      "Cultura":"cultura",
+      "Ocio":"ocio",           "Lleure":"ocio",
+    };
+    if (catMap[filter]) url += `&categories=cs.{${catMap[filter]}}`;
+
+    // Filtros avanzados
+    if (advFilters.budget) url += `&budget=eq.${advFilters.budget}`;
+    if (advFilters.dur)    url += `&duration_type=eq.${advFilters.dur}`;
+    if (advFilters.vibe)   url += `&vibe=eq.${advFilters.vibe}`;
+    if (advFilters.group)  url += `&tags=cs.{${advFilters.group}}`;
+    if (advFilters.transport) url += `&tags=cs.{${advFilters.transport}}`;
+
     try {
       const r = await fetch(url, {headers:this.h});
       const d = await r.json();
@@ -462,7 +500,6 @@ function FeedCard({plan, t, onClick, user, onRequireAuth}) {
   const [saved, setSaved] = useState(() => !!db.getSavedLocal().find(p=>p.id===plan.id));
   const [votes, setVotes] = useState(plan.votes_count||0);
   const [voted, setVoted] = useState(false);
-  const budgetL = {low:"Económico",mid:"Normal",high:"Sin límite"};
 
   useEffect(() => {
     if (!user?.id || !user?.token) return;
@@ -506,9 +543,11 @@ function FeedCard({plan, t, onClick, user, onRequireAuth}) {
       onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 1px 12px rgba(0,0,0,0.05)";}}>
       <div style={{position:"relative"}}>
         <PhotoCarousel photos={plan.photos} fallback={plan.image_url || plan.img} height={210} emoji={plan.emoji}/>
-        <div style={{position:"absolute",top:12,left:12,background:"rgba(255,255,255,0.88)",backdropFilter:"blur(8px)",borderRadius:20,padding:"4px 11px",fontSize:11,fontWeight:600,color:C.black}}>
-          📍 {plan.zone}
-        </div>
+        {(plan.location_name || plan.zone) && (
+          <div style={{position:"absolute",top:12,left:12,background:"rgba(255,255,255,0.88)",backdropFilter:"blur(8px)",borderRadius:20,padding:"4px 11px",fontSize:11,fontWeight:600,color:C.black}}>
+            📍 {plan.location_name || plan.zone}
+          </div>
+        )}
         <button onClick={handleSave} style={{position:"absolute",top:10,right:10,background:saved?"rgba(181,217,106,0.9)":"rgba(255,255,255,0.88)",backdropFilter:"blur(8px)",border:"none",borderRadius:"50%",width:34,height:34,cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.2s"}}>
           {saved?"🔖":"🤍"}
         </button>
@@ -518,9 +557,10 @@ function FeedCard({plan, t, onClick, user, onRequireAuth}) {
         <h3 style={{fontFamily:F,fontSize:16,fontWeight:800,color:C.black,marginBottom:5,lineHeight:1.25,letterSpacing:-0.2}}>{plan.title}</h3>
         <p style={{fontSize:13,color:C.muted,marginBottom:12,lineHeight:1.5}}>{plan.subtitle}</p>
         <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
-          {plan.vibe&&<Tag label={plan.vibe} color="green"/>}
-          {plan.budget&&<Tag label={budgetL[plan.budget]||plan.budget} color="muted"/>}
-          {plan.duration&&<Tag label={plan.duration} color="muted"/>}
+          {plan.vibe && t.vibeLabels?.[plan.vibe] && <Tag label={t.vibeLabels[plan.vibe]} color="green"/>}
+          {plan.duration_type && t.durTypes?.[plan.duration_type] && <Tag label={t.durTypes[plan.duration_type]} color="muted"/>}
+          {plan.budget && t.budgetVals && <Tag label={t.budgetOpts[t.budgetVals.indexOf(plan.budget)] || plan.budget} color="muted"/>}
+          {plan.categories?.[0] && t.catLabels?.[plan.categories[0]] && <Tag label={t.catLabels[plan.categories[0]]} color="accent"/>}
         </div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div style={{display:"flex",gap:8}}>
@@ -536,93 +576,84 @@ function FeedCard({plan, t, onClick, user, onRequireAuth}) {
 
 // ── Filters Panel ─────────────────────────────────────────────────────────────
 function FiltersPanel({t, onClose, onApply, activeFilters}) {
-  const [cat, setCat] = useState(activeFilters.cat||null);
-  const [dist, setDist] = useState(activeFilters.dist||null);
-  const [dur, setDur] = useState(activeFilters.dur||null);
-  const [budget, setBudget] = useState(activeFilters.budget||null);
+  const [cat,       setCat]       = useState(activeFilters.cat||null);
+  const [dur,       setDur]       = useState(activeFilters.dur||null);
+  const [budget,    setBudget]    = useState(activeFilters.budget||null);
+  const [vibe,      setVibe]      = useState(activeFilters.vibe||null);
+  const [group,     setGroup]     = useState(activeFilters.group||null);
   const [transport, setTransport] = useState(activeFilters.transport||null);
-  const [group, setGroup] = useState(activeFilters.group||null);
-  const [userLocation, setUserLocation] = useState(null);
-  const [locationError, setLocationError] = useState(null);
 
-  const requestLocation = () => {
-    setLocationError(null);
-    if (!navigator.geolocation) { setLocationError("Tu navegador no soporta geolocalización"); return; }
-    navigator.geolocation.getCurrentPosition(
-      pos => setUserLocation({lat:pos.coords.latitude, lng:pos.coords.longitude}),
-      (err) => {
-        if (err.code === 1) setLocationError("Permiso denegado. Actívalo en ajustes del navegador.");
-        else setLocationError("No se pudo obtener la ubicación. Inténtalo de nuevo.");
-      },
-      { timeout: 10000, enableHighAccuracy: false }
-    );
-  };
+  const hasActive = cat||dur||budget||vibe||group||transport;
+  const activeCount = [cat,dur,budget,vibe,group,transport].filter(Boolean).length;
 
-  const hasActive = cat||dist||dur||budget||transport||group;
+  const clearAll = () => { setCat(null);setDur(null);setBudget(null);setVibe(null);setGroup(null);setTransport(null); };
 
-  const Row = ({label,opts,val,set}) => (
+  // Row genérico — opts son labels, vals son los slugs reales que van a la DB
+  const Row = ({label, opts, vals, val, set}) => (
     <div style={{marginBottom:18}}>
       <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:0.6,marginBottom:8}}>{label}</div>
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-        {opts.map(o=>(
-          <button key={o} onClick={()=>set(val===o?null:o)} style={{background:val===o?C.black:C.bg,color:val===o?C.white:C.muted,border:`1.5px solid ${val===o?C.black:C.border}`,borderRadius:20,padding:"7px 14px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:F,transition:"all 0.15s"}}>{o}</button>
-        ))}
+        {opts.map((o,i) => {
+          const v = vals ? vals[i] : o;
+          return (
+            <button key={v} onClick={()=>set(val===v?null:v)}
+              style={{background:val===v?C.black:C.bg,color:val===v?C.white:C.muted,border:`1.5px solid ${val===v?C.black:C.border}`,borderRadius:20,padding:"7px 14px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:F,transition:"all 0.15s"}}>
+              {o}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 
   const touchStartY = useRef(0);
-
   const handleDragStart = (e) => { touchStartY.current = e.touches[0].clientY; };
-  const handleDragEnd = (e) => {
-    const diff = e.changedTouches[0].clientY - touchStartY.current;
-    if (diff > 60) onClose();
+  const handleDragEnd   = (e) => { if (e.changedTouches[0].clientY - touchStartY.current > 60) onClose(); };
+
+  const handleApply = () => {
+    onApply({cat, dur, budget, vibe, group, transport});
+    onClose();
   };
 
   return (
     <div style={{position:"fixed",inset:0,background:C.overlay,zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
       <div style={{background:C.card,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,maxHeight:"85vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
-        {/* Drag handle — touch events here to swipe down and close */}
+
+        {/* Drag handle */}
         <div onTouchStart={handleDragStart} onTouchEnd={handleDragEnd}
-          style={{padding:"16px 24px 8px", flexShrink:0, cursor:"grab"}}>
+          style={{padding:"16px 24px 8px",flexShrink:0,cursor:"grab"}}>
           <div style={{width:36,height:4,background:C.border,borderRadius:2,margin:"0 auto"}}/>
         </div>
-        {/* Scrollable content — independent of drag handle */}
-        <div style={{overflowY:"auto", padding:"0 24px 24px", flex:1}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
-          <span style={{fontFamily:F,fontSize:18,fontWeight:800,color:C.black}}>{t.filters}</span>
-          <button onClick={()=>{setCat(null);setDist(null);setDur(null);setBudget(null);setTransport(null);setGroup(null);}} style={{background:"transparent",border:"none",fontSize:13,color:hasActive?C.black:C.dim,cursor:"pointer",fontFamily:F,fontWeight:hasActive?700:400}}>{t.clearFilters}</button>
-        </div>
 
-        <Row label="Categoría" opts={t.cats} val={cat} set={setCat}/>
+        {/* Scrollable content */}
+        <div style={{overflowY:"auto",padding:"0 24px 24px",flex:1}}>
 
-        <div style={{marginBottom:18}}>
-          <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:0.6,marginBottom:8}}>{t.distanceFilter}</div>
-          {!userLocation ? (
-            <div>
-              <div style={{background:C.accent+"20",border:`1px solid ${C.accent}`,borderRadius:12,padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:13,color:C.accentText}}>{t.locationNeeded}</span>
-                <button onClick={requestLocation} style={{background:C.accent,border:"none",borderRadius:10,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",color:C.accentText,fontFamily:F}}>{t.allowLocation}</button>
-              </div>
-              {locationError && <div style={{fontSize:12,color:"#B91C1C",marginTop:8,padding:"6px 10px",background:"#FEE2E2",borderRadius:8}}>{locationError}</div>}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
+            <span style={{fontFamily:F,fontSize:18,fontWeight:800,color:C.black}}>{t.filters}</span>
+            <button onClick={clearAll} style={{background:"transparent",border:"none",fontSize:13,color:hasActive?C.black:C.dim,cursor:"pointer",fontFamily:F,fontWeight:hasActive?700:400}}>{t.clearFilters}</button>
+          </div>
+
+          <Row label="Categoría"       opts={t.cats}         val={cat}       set={setCat}/>
+          <Row label={t.durationFilter} opts={t.durOpts}     vals={t.durVals}  val={dur}   set={setDur}/>
+          <Row label={t.vibeFilter}     opts={t.vibeOpts}    vals={t.vibeVals} val={vibe}  set={setVibe}/>
+          <Row label={t.budgetFilter}   opts={t.budgetOpts}  vals={t.budgetVals} val={budget} set={setBudget}/>
+          <Row label={t.groupFilter}    opts={t.groupOpts}   vals={t.groupVals}  val={group}  set={setGroup}/>
+          <Row label={t.transportFilter} opts={t.transportOpts} vals={t.transportVals} val={transport} set={setTransport}/>
+
+          {/* Distancia — proximamente */}
+          <div style={{marginBottom:18}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:0.6,marginBottom:8}}>{t.distanceFilter}</div>
+            <div style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 14px"}}>
+              <span style={{fontSize:13,color:C.dim}}>🗺️ Próximamente — filtrar por distancia desde tu ciudad</span>
             </div>
-          ) : (
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              {t.distOpts.map(o=><button key={o} onClick={()=>setDist(dist===o?null:o)} style={{background:dist===o?C.black:C.bg,color:dist===o?C.white:C.muted,border:`1.5px solid ${dist===o?C.black:C.border}`,borderRadius:20,padding:"7px 14px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:F}}>{o}</button>)}
-            </div>
-          )}
+          </div>
+
+          <Btn onClick={handleApply} variant="black" style={{width:"100%",padding:"15px",borderRadius:14,marginTop:4}}>
+            {t.applyFilters}{hasActive ? ` (${activeCount})` : ""}
+          </Btn>
+
         </div>
-
-        <Row label={t.durationFilter} opts={t.durOpts} val={dur} set={setDur}/>
-        <Row label={t.budgetFilter} opts={t.budgetOpts} val={budget} set={setBudget}/>
-        <Row label={t.transportFilter} opts={t.transportOpts} val={transport} set={setTransport}/>
-        <Row label={t.groupFilter} opts={t.groupOpts} val={group} set={setGroup}/>
-
-        <Btn onClick={()=>{onApply({cat,dist,dur,budget,transport,group});onClose();}} variant="black" style={{width:"100%",padding:"15px",borderRadius:14,marginTop:4}}>
-          {t.applyFilters} {hasActive?`(${[cat,dist,dur,budget,transport,group].filter(Boolean).length})`:""}
-        </Btn>
-        </div>{/* end scrollable */}
-      </div>{/* end sheet */}
+      </div>
     </div>
   );
 }
@@ -637,35 +668,33 @@ function FeedScreen({t, go, onPlanClick, onUpload, user, onRequireAuth}) {
   const [activeFilters, setActiveFilters] = useState({});
   const hasActiveFilters = Object.values(activeFilters).some(Boolean);
 
-  const load = async (f, rand) => {
+  const load = async (f, adv, rand) => {
     setLoading(true);
-    const data = await db.getPlans(f, rand);
+    const data = await db.getPlans(f, adv, rand);
     setPlans(data);
     setLoading(false);
   };
 
-  // Load from Supabase on mount — this is what was missing
-  useEffect(() => { load("all", false); }, []);
+  useEffect(() => { load("all", {}, false); }, []);
 
   const handleCat = (f) => {
     const nf = filter===f?"all":f;
     setFilter(nf);
-    load(nf, sortRandom);
+    load(nf, activeFilters, sortRandom);
   };
 
   const toggleSort = () => {
     const nr = !sortRandom;
     setSortRandom(nr);
-    load(filter, nr);
+    load(filter, activeFilters, nr);
   };
 
   const applyFilters = (f) => {
     setActiveFilters(f);
-    // If category was set in advanced filters, also update the quick filter bar
-    if (f.cat) {
-      setFilter(f.cat);
-      load(f.cat, sortRandom);
-    }
+    // Si se cambió la categoría desde el panel avanzado, sincronizar la barra rápida
+    const newCatFilter = f.cat ? f.cat : filter;
+    if (f.cat) setFilter(f.cat);
+    load(newCatFilter, f, sortRandom);
   };
 
   return (
@@ -768,7 +797,7 @@ function PlanDetail({plan, t, onBack, user, onRequireAuth, go}) {
 
       <div style={{padding:"20px 16px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <div style={{fontSize:13,color:C.muted}}>📍 {plan.zone}</div>
+          <div style={{fontSize:13,color:C.muted}}>📍 {plan.location_name || plan.zone || "Sin ubicación"}</div>
           <div style={{display:"flex",gap:8}}>
             <button onClick={handleSave} style={{background:saved?C.accent:"transparent",border:`1.5px solid ${saved?C.accent:C.border}`,borderRadius:20,padding:"6px 14px",cursor:"pointer",fontSize:12,fontWeight:700,color:saved?C.accentText:C.muted,transition:"all 0.2s",fontFamily:F}}>{saved?t.saved:t.save}</button>
             <button onClick={()=>navigator.share&&navigator.share({title:plan.title,text:plan.subtitle,url:window.location.href})} style={{background:"transparent",border:`1.5px solid ${C.border}`,borderRadius:20,padding:"6px 12px",cursor:"pointer",fontSize:12,color:C.muted,fontFamily:F}}>↗</button>
