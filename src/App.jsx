@@ -64,10 +64,26 @@ const T = {
     tip2Ph: "Consejo 2 · Ej: Mejor ir entre semana",
     addPhotos: "Añadir fotos", photosDesc: "Hasta 5 fotos · Se mostrarán en carrusel",
     login: "Iniciar sesión", register: "Crear cuenta",
-    loginSub: "Para guardar planes y subir los tuyos",
+    loginSub: "Bienvenido/a de nuevo.",
+    registerSub: "Únete y empieza a guardar y compartir planes.",
     name: "Tu nombre", email: "Email", password: "Contraseña (mín. 6 caracteres)",
+    namePh: "¿Cómo te llaman?",
     alreadyAccount: "¿Ya tienes cuenta? Inicia sesión",
     noAccount: "¿No tienes cuenta? Regístrate",
+    logoutConfirm: "¿Seguro que quieres cerrar sesión?",
+    nameRequired: "El nombre es obligatorio para registrarte.",
+    emailRequired: "Introduce un email válido.",
+    passwordShort: "La contraseña debe tener al menos 6 caracteres.",
+    fillFields: "Rellena todos los campos obligatorios.",
+    authErrors: {
+      "Invalid login credentials": "Email o contraseña incorrectos.",
+      "Email not confirmed": "Confirma tu email antes de entrar. Revisa tu bandeja de entrada.",
+      "User already registered": "Ya existe una cuenta con ese email. ¿Quieres iniciar sesión?",
+      "Password should be at least 6 characters": "La contraseña debe tener al menos 6 caracteres.",
+      "Unable to validate email address: invalid format": "El formato del email no es válido.",
+      "signup_disabled": "El registro está temporalmente desactivado.",
+      "Email rate limit exceeded": "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
+    },
     bio: "Sobre mí", bioPlaceholder: "Cuéntanos algo sobre ti y tus planes favoritos...",
     editProfile: "Editar perfil", saveProfile: "Guardar cambios",
     viewProfile: "Ver perfil", plansByUser: "Planes de",
@@ -137,10 +153,26 @@ const T = {
     tip2Ph: "Consell 2 · Ex: Millor entre setmana",
     addPhotos: "Afegir fotos", photosDesc: "Fins a 5 fotos · Es mostraran en carrusel",
     login: "Iniciar sessió", register: "Crear compte",
-    loginSub: "Per guardar plans i pujar els teus",
+    loginSub: "Benvingut/da de nou.",
+    registerSub: "Uneix-te i comença a guardar i compartir plans.",
     name: "El teu nom", email: "Email", password: "Contrasenya (mínim 6 caràcters)",
+    namePh: "Com et diuen?",
     alreadyAccount: "Ja tens compte? Inicia sessió",
     noAccount: "No tens compte? Registra't",
+    logoutConfirm: "Segur que vols tancar la sessió?",
+    nameRequired: "El nom és obligatori per registrar-te.",
+    emailRequired: "Introdueix un email vàlid.",
+    passwordShort: "La contrasenya ha de tenir almenys 6 caràcters.",
+    fillFields: "Omple tots els camps obligatoris.",
+    authErrors: {
+      "Invalid login credentials": "Email o contrasenya incorrectes.",
+      "Email not confirmed": "Confirma el teu email abans d'entrar. Revisa la safata d'entrada.",
+      "User already registered": "Ja existeix un compte amb aquest email. Vols iniciar sessió?",
+      "Password should be at least 6 characters": "La contrasenya ha de tenir almenys 6 caràcters.",
+      "Unable to validate email address: invalid format": "El format de l'email no és vàlid.",
+      "signup_disabled": "El registre està temporalment desactivat.",
+      "Email rate limit exceeded": "Massa intents. Espera uns minuts i torna-ho a provar.",
+    },
     bio: "Sobre mi", bioPlaceholder: "Explica'ns alguna cosa sobre tu i els teus plans favorits...",
     editProfile: "Editar perfil", saveProfile: "Desar canvis",
     viewProfile: "Veure perfil", plansByUser: "Plans de",
@@ -1421,52 +1453,170 @@ function UploadModal({t, onClose, user, onUploaded}) {
 }
 
 // ── Auth Modal ────────────────────────────────────────────────────────────────
-function AuthModal({t, onClose, onSuccess}) {
-  const [isLogin, setIsLogin] = useState(false);
-  const [email, setEmail] = useState("");
+function AuthModal({t, onClose, onSuccess, initialMode="register"}) {
+  const [isLogin, setIsLogin] = useState(initialMode === "login");
+  const [email, setEmail]     = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+  const [name, setName]       = useState("");
+  const [showPw, setShowPw]   = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
+  const [error, setError]     = useState("");
+  const [done, setDone]       = useState(false);
+
+  // Traducir errores de Supabase al idioma del usuario
+  const translateError = (raw) => {
+    if (!raw) return t.authErrors?.["Invalid login credentials"] || "Error. Inténtalo de nuevo.";
+    for (const [key, val] of Object.entries(t.authErrors || {})) {
+      if (raw.includes(key)) return val;
+    }
+    return raw; // fallback: mostrar el mensaje original si no hay traducción
+  };
+
+  const validate = () => {
+    if (!isLogin && !name.trim()) { setError(t.nameRequired); return false; }
+    if (!email.trim()) { setError(t.emailRequired); return false; }
+    if (!password.trim()) { setError(t.fillFields); return false; }
+    if (password.length < 6) { setError(t.passwordShort); return false; }
+    return true;
+  };
 
   const handleSubmit = async () => {
-    if (!email.trim()||!password.trim()) { setError("Rellena todos los campos"); return; }
-    if (!isLogin&&password.length<6) { setError("La contraseña debe tener al menos 6 caracteres"); return; }
+    if (!validate()) return;
     setLoading(true); setError("");
     try {
-      const data = isLogin ? await auth.signIn(email,password) : await auth.signUp(email,password,name);
-      if (data.error||data.msg) { setError(data.error_description||data.msg||"Error. Inténtalo de nuevo."); setLoading(false); return; }
+      const data = isLogin
+        ? await auth.signIn(email.trim(), password)
+        : await auth.signUp(email.trim(), password, name.trim());
+
+      if (data.error || data.msg) {
+        setError(translateError(data.error_description || data.msg));
+        setLoading(false);
+        return;
+      }
       if (data.access_token) {
         auth.save(data);
         setDone(true);
-        setTimeout(()=>{ onSuccess({token:data.access_token,id:data.user?.id,email:data.user?.email,name:data.user?.user_metadata?.full_name||data.user?.email?.split("@")[0]}); onClose(); },800);
-      } else { setError("Error inesperado. Inténtalo de nuevo."); setLoading(false); }
-    } catch { setError("Error de conexión."); setLoading(false); }
+        setTimeout(() => {
+          onSuccess({
+            token: data.access_token,
+            id:    data.user?.id,
+            email: data.user?.email,
+            name:  data.user?.user_metadata?.full_name || name.trim() || data.user?.email?.split("@")[0],
+          });
+          onClose();
+        }, 700);
+      } else {
+        // Registro sin access_token = email pendiente de verificar
+        setError(t.authErrors?.["Email not confirmed"] || "Revisa tu email para confirmar la cuenta.");
+        setLoading(false);
+      }
+    } catch {
+      setError("Error de conexión. Comprueba tu red e inténtalo de nuevo.");
+      setLoading(false);
+    }
   };
 
-  const inp = {background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:12,padding:"14px 16px",fontSize:14,color:C.text,outline:"none",fontFamily:F,width:"100%",boxSizing:"border-box"};
+  const handleKeyDown = (e) => { if (e.key === "Enter" && !loading) handleSubmit(); };
+  const switchMode = () => { setIsLogin(v => !v); setError(""); setShowPw(false); };
+
+  // Bloquear cierre con overlay mientras carga
+  const handleOverlayClick = () => { if (!loading) onClose(); };
+
+  const inp = {
+    background: C.bg, border: `1.5px solid ${C.border}`,
+    borderRadius: 12, padding: "14px 16px",
+    fontSize: 14, color: C.text, outline: "none",
+    fontFamily: F, width: "100%", boxSizing: "border-box",
+  };
 
   return (
-    <div style={{position:"fixed",inset:0,background:C.overlay,zIndex:400,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div style={{background:C.card,borderRadius:"20px 20px 0 0",padding:24,width:"100%",maxWidth:480}} onClick={e=>e.stopPropagation()}>
+    <div style={{position:"fixed",inset:0,background:C.overlay,zIndex:400,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+      onClick={handleOverlayClick}>
+      <div style={{background:C.card,borderRadius:"20px 20px 0 0",padding:24,width:"100%",maxWidth:480}}
+        onClick={e=>e.stopPropagation()}>
         <div style={{width:36,height:4,background:C.border,borderRadius:2,margin:"0 auto 20px"}}/>
+
         {done ? (
           <div style={{textAlign:"center",padding:"20px 0"}}>
             <div style={{fontSize:48,marginBottom:12}}>✓</div>
-            <div style={{fontSize:18,fontWeight:700,color:C.black,fontFamily:F}}>¡Bienvenido/a!</div>
+            <div style={{fontSize:18,fontWeight:800,color:C.black,fontFamily:F}}>
+              {isLogin ? "¡Bienvenido/a de nuevo!" : "¡Cuenta creada!"}
+            </div>
           </div>
         ) : (
           <>
-            <h2 style={{fontFamily:F,fontSize:20,fontWeight:900,color:C.black,marginBottom:6}}>{isLogin?t.login:t.register}</h2>
-            <p style={{fontSize:13,color:C.muted,marginBottom:20}}>{t.loginSub}</p>
+            <h2 style={{fontFamily:F,fontSize:20,fontWeight:900,color:C.black,marginBottom:6}}>
+              {isLogin ? t.login : t.register}
+            </h2>
+            <p style={{fontSize:13,color:C.muted,marginBottom:20}}>
+              {isLogin ? t.loginSub : t.registerSub}
+            </p>
+
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              {!isLogin&&<input value={name} onChange={e=>setName(e.target.value)} placeholder={t.name} style={inp}/>}
-              <input value={email} onChange={e=>setEmail(e.target.value)} placeholder={t.email} type="email" style={{...inp,border:`1.5px solid ${email?C.accent:C.border}`}}/>
-              <input value={password} onChange={e=>setPassword(e.target.value)} placeholder={t.password} type="password" style={{...inp,border:`1.5px solid ${password.length>=6?C.accent:C.border}`}}/>
-              {error&&<div style={{background:"#FEE2E2",border:"1px solid #FCA5A5",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#B91C1C"}}>{error}</div>}
-              <Btn onClick={handleSubmit} variant="black" style={{width:"100%",padding:"15px",fontSize:15,borderRadius:14,opacity:loading?0.7:1}}>{loading?"...":(isLogin?t.login:t.register)}</Btn>
-              <button onClick={()=>{setIsLogin(!isLogin);setError("");}} style={{background:"transparent",border:"none",color:C.muted,fontSize:13,cursor:"pointer",fontFamily:F}}>{isLogin?t.noAccount:t.alreadyAccount}</button>
+              {/* Nombre — solo en registro */}
+              {!isLogin && (
+                <input
+                  value={name} onChange={e=>setName(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={t.namePh || t.name}
+                  autoComplete="name"
+                  style={{...inp, border:`1.5px solid ${name.trim()?C.accent:C.border}`}}
+                />
+              )}
+
+              {/* Email */}
+              <input
+                value={email} onChange={e=>setEmail(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={t.email} type="email"
+                autoComplete="email"
+                style={{...inp, border:`1.5px solid ${email.trim()?C.accent:C.border}`}}
+              />
+
+              {/* Contraseña + toggle mostrar/ocultar */}
+              <div style={{position:"relative"}}>
+                <input
+                  value={password} onChange={e=>setPassword(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={t.password}
+                  type={showPw ? "text" : "password"}
+                  autoComplete={isLogin ? "current-password" : "new-password"}
+                  style={{...inp, border:`1.5px solid ${password.length>=6?C.accent:C.border}`, paddingRight:48}}
+                />
+                <button
+                  type="button"
+                  onClick={()=>setShowPw(v=>!v)}
+                  style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:C.muted,padding:4,lineHeight:1}}
+                  tabIndex={-1}
+                  aria-label={showPw?"Ocultar contraseña":"Mostrar contraseña"}
+                >
+                  {showPw ? "🙈" : "👁️"}
+                </button>
+              </div>
+
+              {/* Error */}
+              {error && (
+                <div style={{background:"#FEE2E2",border:"1px solid #FCA5A5",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#B91C1C",lineHeight:1.5}}>
+                  {error}
+                </div>
+              )}
+
+              {/* Submit */}
+              <Btn
+                onClick={handleSubmit}
+                variant="black"
+                style={{width:"100%",padding:"15px",fontSize:15,borderRadius:14,opacity:loading?0.6:1,pointerEvents:loading?"none":"auto"}}
+              >
+                {loading ? "..." : (isLogin ? t.login : t.register)}
+              </Btn>
+
+              {/* Cambiar modo */}
+              <button
+                onClick={switchMode}
+                style={{background:"transparent",border:"none",color:C.muted,fontSize:13,cursor:"pointer",fontFamily:F,padding:"4px 0"}}
+              >
+                {isLogin ? t.noAccount : t.alreadyAccount}
+              </button>
             </div>
           </>
         )}
@@ -1833,8 +1983,8 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
       <div style={{fontSize:56,marginBottom:20}}>👤</div>
       <h2 style={{fontFamily:F,fontSize:22,fontWeight:900,color:C.black,marginBottom:10,textAlign:"center"}}>{t.register}</h2>
       <p style={{fontSize:14,color:C.muted,textAlign:"center",marginBottom:32,lineHeight:1.6}}>Regístrate para guardar planes, subir los tuyos y llevar un historial de tus escapadas.</p>
-      <Btn onClick={onLogin} variant="black" style={{width:"100%",maxWidth:320,padding:"15px",fontSize:15,borderRadius:14,marginBottom:12}}>{t.register}</Btn>
-      <button onClick={onLogin} style={{background:"transparent",border:"none",color:C.muted,fontSize:14,cursor:"pointer",fontFamily:F}}>{t.alreadyAccount}</button>
+      <Btn onClick={()=>onLogin("register")} variant="black" style={{width:"100%",maxWidth:320,padding:"15px",fontSize:15,borderRadius:14,marginBottom:12}}>{t.register}</Btn>
+      <button onClick={()=>onLogin("login")} style={{background:"transparent",border:"none",color:C.muted,fontSize:14,cursor:"pointer",fontFamily:F}}>{t.alreadyAccount}</button>
     </div>
   );
 
@@ -1864,7 +2014,7 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
           }} style={{background:editMode?C.black:C.bg,color:editMode?C.white:C.muted,border:`1px solid ${editMode?C.black:C.border}`,borderRadius:20,padding:"6px 14px",fontSize:12,cursor:"pointer",fontFamily:F,fontWeight:700}}>
             {editMode?t.saveProfile:t.editProfile}
           </button>
-          <button onClick={onLogout} style={{background:"rgba(255,255,255,0.8)",border:"none",borderRadius:20,padding:"6px 14px",fontSize:12,color:C.muted,cursor:"pointer",fontFamily:F}}>{t.logout}</button>
+          <button onClick={()=>{ if(window.confirm(t.logoutConfirm)) onLogout(); }} style={{background:"rgba(255,255,255,0.8)",border:"none",borderRadius:20,padding:"6px 14px",fontSize:12,color:C.muted,cursor:"pointer",fontFamily:F}}>{t.logout}</button>
         </div>
       </div>
 
@@ -2066,7 +2216,7 @@ export default function App() {
   const [planError, setPlanError] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
-  const [showAuth, setShowAuth] = useState(false);
+  const [showAuth, setShowAuth] = useState(null); // null | "login" | "register"
   const [user, setUser] = useState(null);
   const [feedKey, setFeedKey] = useState(0);
   const [profileKey, setProfileKey] = useState(0);
@@ -2139,8 +2289,8 @@ export default function App() {
       window.history.replaceState({screen:"feed", params:{}}, "", "/");
     }
   }, []);
-  const requireAuth = () => setShowAuth(true);
-  const handleUpload = () => { if(!user){setShowAuth(true);return;} setShowUpload(true); };
+  const requireAuth = () => setShowAuth("register");
+  const handleUpload = () => { if(!user){setShowAuth("register");return;} setShowUpload(true); };
   const handleLogout = () => { auth.clear(); setUser(null); };
   const handleUploaded = () => { setFeedKey(k=>k+1); setProfileKey(k=>k+1); }; // reload feed+profile after upload
 
@@ -2187,7 +2337,7 @@ export default function App() {
       `}</style>
 
       {showUpload&&<UploadModal t={t} onClose={()=>setShowUpload(false)} user={user} onUploaded={handleUploaded}/>}
-      {showAuth&&<AuthModal t={t} onClose={()=>setShowAuth(false)} onSuccess={u=>{setUser(u);setShowAuth(false);}}/>}
+      {showAuth&&<AuthModal t={t} initialMode={showAuth} onClose={()=>setShowAuth(null)} onSuccess={u=>{setUser(u);setShowAuth(null);}}/>}
 
       {screen!=="loading"&&<TopNav screen={screen} go={go} t={t} user={user} onCreatePlan={()=>go("time")} onUpload={handleUpload}/>}
 
@@ -2207,7 +2357,7 @@ export default function App() {
       {screen==="quiz"&&<QuizScreen t={t} timeData={timeData} onComplete={handleQuizComplete} onBack={()=>go("time")}/>}
       {screen==="loading"&&<LoadingScreen t={t}/>}
       {screen==="generated"&&<GeneratedPlan plan={generatedPlan} answers={answers} t={t} onBack={()=>go("feed")} onRegen={handleRegen} go={go} error={planError} user={user} onRequireAuth={requireAuth}/>}
-      {screen==="profile"&&<ProfileScreen key={profileKey} t={t} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={()=>setShowAuth(true)} user={user} onLogout={handleLogout} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail",{planId:p.id,from:"profile"});}}/> }
+      {screen==="profile"&&<ProfileScreen key={profileKey} t={t} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={(mode="register")=>setShowAuth(mode)} user={user} onLogout={handleLogout} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail",{planId:p.id,from:"profile"});}}/> }
     </div>
   );
 }
