@@ -387,6 +387,17 @@ const db = {
     } catch { return false; }
   },
 
+  async getPlanById(id) {
+    try {
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/plans?id=eq.${id}&is_approved=eq.true&limit=1`,
+        {headers:this.h}
+      );
+      const d = await r.json();
+      return Array.isArray(d) && d.length > 0 ? d[0] : null;
+    } catch { return null; }
+  },
+
   async report(desc) {
     try { await fetch(`${SUPABASE_URL}/rest/v1/incidents`, {method:"POST", headers:this.h, body:JSON.stringify({description:desc})}); } catch {}
   },
@@ -2046,12 +2057,8 @@ function UserProfileScreen({userId, userName, t, onBack, onPlanClick}) {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [screen, setScreen] = useState(()=>{
-    try { return sessionStorage.getItem("op_screen")||"feed"; } catch { return "feed"; }
-  });
-  const [screenParams, setScreenParams] = useState(()=>{
-    try { return JSON.parse(sessionStorage.getItem("op_screen_params")||"{}"); } catch { return {}; }
-  });
+  const [screen, setScreen] = useState("feed");
+  const [screenParams, setScreenParams] = useState({});
   const [lang, setLang] = useState(()=>{ try{return localStorage.getItem("op_lang")||"es";}catch{return"es";} });
   const [timeData, setTimeData] = useState(null);
   const [answers, setAnswers] = useState(null);
@@ -2061,8 +2068,8 @@ export default function App() {
   const [showUpload, setShowUpload] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [user, setUser] = useState(null);
-  const [feedKey, setFeedKey] = useState(0); // force feed reload
-  const [profileKey, setProfileKey] = useState(0); // force profile reload
+  const [feedKey, setFeedKey] = useState(0);
+  const [profileKey, setProfileKey] = useState(0);
   const t = T[lang];
 
   // Persist lang
@@ -2071,11 +2078,67 @@ export default function App() {
   // Restore session
   useEffect(()=>{ const s=auth.load(); if(s?.token) setUser(s); },[]);
 
-  const go = (s, params={}) => {
-    setScreen(s); setScreenParams(params);
-    try { sessionStorage.setItem("op_screen", s); sessionStorage.setItem("op_screen_params", JSON.stringify(params)); } catch {}
+  // ── URL routing ──────────────────────────────────────────────────────────────
+  // Convierte screen+params a una URL limpia
+  const screenToUrl = (s, params={}) => {
+    if (s === "detail" && params.planId) return `/p/${params.planId}`;
+    return "/";
+  };
+
+  // Aplica un screen sin tocar el historial (usado por popstate)
+  const applyScreen = (s, params={}) => {
+    setScreen(s);
+    setScreenParams(params);
     if (s !== "profile") window.scrollTo(0,0);
   };
+
+  const go = (s, params={}) => {
+    applyScreen(s, params);
+    const url = screenToUrl(s, params);
+    window.history.pushState({screen:s, params}, "", url);
+  };
+
+  // Botón atrás del navegador
+  useEffect(() => {
+    const onPop = (e) => {
+      const state = e.state;
+      if (state?.screen) {
+        // Si volvemos a un detail, necesitamos el plan en memoria
+        if (state.screen === "detail" && state.params?.planId && selectedPlan?.id === state.params.planId) {
+          applyScreen("detail", state.params);
+        } else {
+          applyScreen(state.screen === "detail" ? "feed" : state.screen, state.params||{});
+        }
+      } else {
+        applyScreen("feed", {});
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [selectedPlan]);
+
+  // Al montar: detectar si la URL es /p/{id} y cargar ese plan directamente
+  useEffect(() => {
+    const path = window.location.pathname;
+    const match = path.match(/^\/p\/([a-f0-9-]{36})$/i);
+    if (match) {
+      const planId = match[1];
+      db.getPlanById(planId).then(plan => {
+        if (plan) {
+          setSelectedPlan(plan);
+          applyScreen("detail", {planId: plan.id, from:"feed"});
+          window.history.replaceState({screen:"detail", params:{planId:plan.id, from:"feed"}}, "", `/p/${plan.id}`);
+        } else {
+          // Plan no encontrado → ir al feed
+          applyScreen("feed", {});
+          window.history.replaceState({screen:"feed", params:{}}, "", "/");
+        }
+      });
+    } else {
+      // URL normal → iniciar en feed y registrar estado inicial
+      window.history.replaceState({screen:"feed", params:{}}, "", "/");
+    }
+  }, []);
   const requireAuth = () => setShowAuth(true);
   const handleUpload = () => { if(!user){setShowAuth(true);return;} setShowUpload(true); };
   const handleLogout = () => { auth.clear(); setUser(null); };
@@ -2128,9 +2191,9 @@ export default function App() {
 
       {screen!=="loading"&&<TopNav screen={screen} go={go} t={t} user={user} onCreatePlan={()=>go("time")} onUpload={handleUpload}/>}
 
-      {screen==="feed"&&<FeedScreen key={feedKey} t={t} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail",{from:"feed"});}} onUpload={handleUpload} user={user} onRequireAuth={requireAuth}/>}
+      {screen==="feed"&&<FeedScreen key={feedKey} t={t} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail",{planId:p.id,from:"feed"});}} onUpload={handleUpload} user={user} onRequireAuth={requireAuth}/>}
       {screen==="detail"&&selectedPlan&&<PlanDetail plan={selectedPlan} t={t} onBack={()=>{ const from=screenParams.from||"feed"; from==="userProfile"?go("userProfile",{userId:screenParams.userId,userName:screenParams.userName,from:"feed"}):go(from); }} user={user} onRequireAuth={requireAuth} go={go}/>}
-      {screen==="userProfile"&&<UserProfileScreen userId={screenParams.userId} userName={screenParams.userName} t={t} onBack={()=>go(screenParams.from||"feed")} onPlanClick={p=>{setSelectedPlan(p);go("detail",{from:"userProfile",userId:screenParams.userId,userName:screenParams.userName});}}/>}
+      {screen==="userProfile"&&<UserProfileScreen userId={screenParams.userId} userName={screenParams.userName} t={t} onBack={()=>go(screenParams.from||"feed")} onPlanClick={p=>{setSelectedPlan(p);go("detail",{planId:p.id,from:"userProfile",userId:screenParams.userId,userName:screenParams.userName});}}/>}
       {screen==="time"&&(
         <div style={{minHeight:"100vh",background:C.bg,paddingTop:52}}>
           <div style={{padding:"20px 16px"}}>
@@ -2144,7 +2207,7 @@ export default function App() {
       {screen==="quiz"&&<QuizScreen t={t} timeData={timeData} onComplete={handleQuizComplete} onBack={()=>go("time")}/>}
       {screen==="loading"&&<LoadingScreen t={t}/>}
       {screen==="generated"&&<GeneratedPlan plan={generatedPlan} answers={answers} t={t} onBack={()=>go("feed")} onRegen={handleRegen} go={go} error={planError} user={user} onRequireAuth={requireAuth}/>}
-      {screen==="profile"&&<ProfileScreen key={profileKey} t={t} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={()=>setShowAuth(true)} user={user} onLogout={handleLogout} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail",{from:"profile"});}}/> }
+      {screen==="profile"&&<ProfileScreen key={profileKey} t={t} lang={lang} setLang={setLang} onUpload={handleUpload} isLoggedIn={!!user} onLogin={()=>setShowAuth(true)} user={user} onLogout={handleLogout} go={go} onPlanClick={p=>{setSelectedPlan(p);go("detail",{planId:p.id,from:"profile"});}}/> }
     </div>
   );
 }
