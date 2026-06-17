@@ -84,6 +84,18 @@ const T = {
       "signup_disabled": "El registro está temporalmente desactivado.",
       "Email rate limit exceeded": "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
     },
+    emailVerificationPending: "Cuenta creada. Revisa tu email y confirma tu dirección para poder entrar.",
+    forgotPassword: "¿Olvidaste tu contraseña?",
+    forgotPasswordTitle: "Recuperar contraseña",
+    forgotPasswordSub: "Introduce tu email y te enviaremos un enlace para restablecerla.",
+    forgotPasswordSent: "Email enviado. Revisa tu bandeja de entrada y sigue las instrucciones.",
+    forgotPasswordBtn: "Enviar enlace",
+    backToLogin: "← Volver a iniciar sesión",
+    deleteAccount: "Eliminar cuenta",
+    deleteAccountConfirm: "¿Estás seguro? Esta acción es permanente e irreversible. Se eliminarán tu cuenta y todos tus datos.",
+    deleteAccountSuccess: "Cuenta eliminada correctamente.",
+    profileSaved: "Perfil guardado ✓",
+    sessionExpired: "Tu sesión ha caducado. Por favor, inicia sesión de nuevo.",
     bio: "Sobre mí", bioPlaceholder: "Cuéntanos algo sobre ti y tus planes favoritos...",
     editProfile: "Editar perfil", saveProfile: "Guardar cambios",
     viewProfile: "Ver perfil", plansByUser: "Planes de",
@@ -173,6 +185,18 @@ const T = {
       "signup_disabled": "El registre està temporalment desactivat.",
       "Email rate limit exceeded": "Massa intents. Espera uns minuts i torna-ho a provar.",
     },
+    emailVerificationPending: "Compte creat. Revisa el teu email i confirma l'adreça per poder entrar.",
+    forgotPassword: "Has oblidat la contrasenya?",
+    forgotPasswordTitle: "Recuperar contrasenya",
+    forgotPasswordSub: "Introdueix el teu email i t'enviarem un enllaç per restablir-la.",
+    forgotPasswordSent: "Email enviat. Revisa la safata d'entrada i segueix les instruccions.",
+    forgotPasswordBtn: "Enviar enllaç",
+    backToLogin: "← Tornar a iniciar sessió",
+    deleteAccount: "Eliminar compte",
+    deleteAccountConfirm: "Estàs segur? Aquesta acció és permanent i irreversible. S'eliminaran el teu compte i totes les teves dades.",
+    deleteAccountSuccess: "Compte eliminat correctament.",
+    profileSaved: "Perfil desat ✓",
+    sessionExpired: "La teva sessió ha caducat. Si us plau, inicia sessió de nou.",
     bio: "Sobre mi", bioPlaceholder: "Explica'ns alguna cosa sobre tu i els teus plans favorits...",
     editProfile: "Editar perfil", saveProfile: "Desar canvis",
     viewProfile: "Veure perfil", plansByUser: "Plans de",
@@ -419,6 +443,20 @@ const db = {
     } catch { return false; }
   },
 
+  async uploadAvatar(file, userId, token) {
+    try {
+      const ext = file.name.split(".").pop();
+      const name = `avatar-${userId}.${ext}`;
+      const r = await fetch(`${SUPABASE_URL}/storage/v1/object/plan-images/${name}`, {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token || SUPABASE_KEY}`, "Content-Type": file.type, "x-upsert": "true" },
+        body: file,
+      });
+      if (r.ok) return `${SUPABASE_URL}/storage/v1/object/public/plan-images/${name}`;
+      return null;
+    } catch { return null; }
+  },
+
   async getPlanById(id) {
     try {
       const r = await fetch(
@@ -437,25 +475,66 @@ const db = {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 const auth = {
+  h: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+
   async signUp(email, password, name) {
     const r = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-      method:"POST", headers:{apikey:SUPABASE_KEY,"Content-Type":"application/json"},
-      body: JSON.stringify({email, password, data:{full_name:name}}),
+      method: "POST", headers: this.h,
+      body: JSON.stringify({ email, password, data: { full_name: name } }),
     });
     return r.json();
   },
+
   async signIn(email, password) {
     const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-      method:"POST", headers:{apikey:SUPABASE_KEY,"Content-Type":"application/json"},
-      body: JSON.stringify({email, password}),
+      method: "POST", headers: this.h,
+      body: JSON.stringify({ email, password }),
     });
     return r.json();
   },
-  save(data) {
-    try { localStorage.setItem("op_session", JSON.stringify({token:data.access_token, id:data.user?.id, email:data.user?.email, name:data.user?.user_metadata?.full_name||data.user?.email?.split("@")[0]})); } catch {}
+
+  async refresh(refreshToken) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: "POST", headers: this.h,
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      return r.json();
+    } catch { return null; }
   },
-  load() { try { const s=localStorage.getItem("op_session"); return s?JSON.parse(s):null; } catch { return null; } },
-  clear() { try { localStorage.removeItem("op_session"); } catch {} },
+
+  async recover(email) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+        method: "POST", headers: this.h,
+        body: JSON.stringify({ email }),
+      });
+      return r.ok;
+    } catch { return false; }
+  },
+
+  save(data) {
+    try {
+      const session = {
+        token:      data.access_token,
+        refresh:    data.refresh_token,
+        expires_at: data.expires_at, // unix timestamp (seconds)
+        id:         data.user?.id,
+        email:      data.user?.email,
+        name:       data.user?.user_metadata?.full_name || data.user?.email?.split("@")[0],
+        avatar:     data.user?.user_metadata?.avatar_url || null,
+      };
+      localStorage.setItem("op_session", JSON.stringify(session));
+    } catch {}
+  },
+
+  load() {
+    try { const s = localStorage.getItem("op_session"); return s ? JSON.parse(s) : null; } catch { return null; }
+  },
+
+  clear() {
+    try { localStorage.removeItem("op_session"); } catch {}
+  },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1455,6 +1534,7 @@ function UploadModal({t, onClose, user, onUploaded}) {
 // ── Auth Modal ────────────────────────────────────────────────────────────────
 function AuthModal({t, onClose, onSuccess, initialMode="register"}) {
   const [isLogin, setIsLogin] = useState(initialMode === "login");
+  const [mode, setMode]       = useState(initialMode); // "login" | "register" | "recover"
   const [email, setEmail]     = useState("");
   const [password, setPassword] = useState("");
   const [name, setName]       = useState("");
@@ -1462,6 +1542,7 @@ function AuthModal({t, onClose, onSuccess, initialMode="register"}) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
   const [done, setDone]       = useState(false);
+  const [recoverSent, setRecoverSent] = useState(false);
 
   // Traducir errores de Supabase al idioma del usuario
   const translateError = (raw) => {
@@ -1498,16 +1579,18 @@ function AuthModal({t, onClose, onSuccess, initialMode="register"}) {
         setDone(true);
         setTimeout(() => {
           onSuccess({
-            token: data.access_token,
-            id:    data.user?.id,
-            email: data.user?.email,
-            name:  data.user?.user_metadata?.full_name || name.trim() || data.user?.email?.split("@")[0],
+            token:      data.access_token,
+            refresh:    data.refresh_token,
+            expires_at: data.expires_at,
+            id:         data.user?.id,
+            email:      data.user?.email,
+            name:       data.user?.user_metadata?.full_name || name.trim() || data.user?.email?.split("@")[0],
           });
           onClose();
         }, 700);
       } else {
-        // Registro sin access_token = email pendiente de verificar
-        setError(t.authErrors?.["Email not confirmed"] || "Revisa tu email para confirmar la cuenta.");
+        // Registro sin access_token → email pendiente de verificar
+        setError(t.emailVerificationPending);
         setLoading(false);
       }
     } catch {
@@ -1516,8 +1599,26 @@ function AuthModal({t, onClose, onSuccess, initialMode="register"}) {
     }
   };
 
-  const handleKeyDown = (e) => { if (e.key === "Enter" && !loading) handleSubmit(); };
-  const switchMode = () => { setIsLogin(v => !v); setError(""); setShowPw(false); };
+  const handleRecover = async () => {
+    if (!email.trim()) { setError(t.emailRequired); return; }
+    setLoading(true); setError("");
+    const ok = await auth.recover(email.trim());
+    setLoading(false);
+    if (ok) setRecoverSent(true);
+    else setError("No hemos podido enviar el email. Inténtalo de nuevo.");
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key !== "Enter" || loading) return;
+    if (mode === "recover") handleRecover();
+    else handleSubmit();
+  };
+
+  const switchMode = (next) => {
+    setMode(next);
+    setIsLogin(next === "login");
+    setError(""); setShowPw(false); setRecoverSent(false);
+  };
 
   // Bloquear cierre con overlay mientras carga
   const handleOverlayClick = () => { if (!loading) onClose(); };
@@ -1543,7 +1644,37 @@ function AuthModal({t, onClose, onSuccess, initialMode="register"}) {
               {isLogin ? "¡Bienvenido/a de nuevo!" : "¡Cuenta creada!"}
             </div>
           </div>
+
+        ) : mode === "recover" ? (
+          /* ── Modo recuperar contraseña ── */
+          <>
+            <h2 style={{fontFamily:F,fontSize:20,fontWeight:900,color:C.black,marginBottom:6}}>{t.forgotPasswordTitle}</h2>
+            <p style={{fontSize:13,color:C.muted,marginBottom:20}}>{t.forgotPasswordSub}</p>
+            {recoverSent ? (
+              <div style={{background:"#D1FAE5",border:"1px solid #6EE7B7",borderRadius:12,padding:"16px 14px",fontSize:14,color:"#065F46",lineHeight:1.5,textAlign:"center"}}>
+                📬 {t.forgotPasswordSent}
+              </div>
+            ) : (
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                <input
+                  value={email} onChange={e=>setEmail(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={t.email} type="email" autoComplete="email"
+                  style={{...inp, border:`1.5px solid ${email.trim()?C.accent:C.border}`}}
+                />
+                {error && <div style={{background:"#FEE2E2",border:"1px solid #FCA5A5",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#B91C1C"}}>{error}</div>}
+                <Btn onClick={handleRecover} variant="black" style={{width:"100%",padding:"15px",fontSize:15,borderRadius:14,opacity:loading?0.6:1,pointerEvents:loading?"none":"auto"}}>
+                  {loading ? "..." : t.forgotPasswordBtn}
+                </Btn>
+              </div>
+            )}
+            <button onClick={()=>switchMode("login")} style={{background:"transparent",border:"none",color:C.muted,fontSize:13,cursor:"pointer",fontFamily:F,marginTop:16,padding:"4px 0"}}>
+              {t.backToLogin}
+            </button>
+          </>
+
         ) : (
+          /* ── Modo login / register ── */
           <>
             <h2 style={{fontFamily:F,fontSize:20,fontWeight:900,color:C.black,marginBottom:6}}>
               {isLogin ? t.login : t.register}
@@ -1583,16 +1714,20 @@ function AuthModal({t, onClose, onSuccess, initialMode="register"}) {
                   autoComplete={isLogin ? "current-password" : "new-password"}
                   style={{...inp, border:`1.5px solid ${password.length>=6?C.accent:C.border}`, paddingRight:48}}
                 />
-                <button
-                  type="button"
-                  onClick={()=>setShowPw(v=>!v)}
+                <button type="button" onClick={()=>setShowPw(v=>!v)}
                   style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:C.muted,padding:4,lineHeight:1}}
-                  tabIndex={-1}
-                  aria-label={showPw?"Ocultar contraseña":"Mostrar contraseña"}
-                >
+                  tabIndex={-1}>
                   {showPw ? "🙈" : "👁️"}
                 </button>
               </div>
+
+              {/* ¿Olvidaste tu contraseña? — solo en login */}
+              {isLogin && (
+                <button onClick={()=>switchMode("recover")}
+                  style={{background:"transparent",border:"none",color:C.muted,fontSize:12,cursor:"pointer",fontFamily:F,textAlign:"right",padding:0}}>
+                  {t.forgotPassword}
+                </button>
+              )}
 
               {/* Error */}
               {error && (
@@ -1602,19 +1737,14 @@ function AuthModal({t, onClose, onSuccess, initialMode="register"}) {
               )}
 
               {/* Submit */}
-              <Btn
-                onClick={handleSubmit}
-                variant="black"
-                style={{width:"100%",padding:"15px",fontSize:15,borderRadius:14,opacity:loading?0.6:1,pointerEvents:loading?"none":"auto"}}
-              >
+              <Btn onClick={handleSubmit} variant="black"
+                style={{width:"100%",padding:"15px",fontSize:15,borderRadius:14,opacity:loading?0.6:1,pointerEvents:loading?"none":"auto"}}>
                 {loading ? "..." : (isLogin ? t.login : t.register)}
               </Btn>
 
               {/* Cambiar modo */}
-              <button
-                onClick={switchMode}
-                style={{background:"transparent",border:"none",color:C.muted,fontSize:13,cursor:"pointer",fontFamily:F,padding:"4px 0"}}
-              >
+              <button onClick={()=>switchMode(isLogin?"register":"login")}
+                style={{background:"transparent",border:"none",color:C.muted,fontSize:13,cursor:"pointer",fontFamily:F,padding:"4px 0"}}>
                 {isLogin ? t.noAccount : t.alreadyAccount}
               </button>
             </div>
@@ -1941,42 +2071,78 @@ function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error, user, onRe
 
 // ── Profile Screen ────────────────────────────────────────────────────────────
 function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, onLogout, go, onPlanClick}) {
-  const [savedPlans, setSavedPlans] = useState([]);
-  const [myPlans, setMyPlans] = useState([]);
-  const [editMode, setEditMode] = useState(false);
-  const [bio, setBio] = useState("");
-  const [avatar, setAvatar] = useState(null);
+  const [savedPlans, setSavedPlans]   = useState([]);
+  const [myPlans, setMyPlans]         = useState([]);
+  const [editMode, setEditMode]       = useState(false);
+  const [bio, setBio]                 = useState("");
+  const [avatar, setAvatar]           = useState(null); // URL pública en Supabase Storage
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileMsg, setProfileMsg]   = useState("");
   const avatarRef = useRef();
 
   useEffect(()=>{
-    // Load saved plans from Supabase when logged in, fallback to localStorage
+    // Planes guardados
     if (user?.id && user?.token) {
-      db.getSavedPlans(user.id, user.token).then(plans => {
-        if (plans && plans.length >= 0) {
-          setSavedPlans(plans);
-        } else {
-          setSavedPlans(db.getSavedLocal());
-        }
-      }).catch(() => setSavedPlans(db.getSavedLocal()));
+      db.getSavedPlans(user.id, user.token)
+        .then(plans => setSavedPlans(plans?.length >= 0 ? plans : db.getSavedLocal()))
+        .catch(() => setSavedPlans(db.getSavedLocal()));
     } else {
       setSavedPlans(db.getSavedLocal());
     }
-    // Load my plans from Supabase
+    // Mis planes
     if (user?.id) {
       fetch(`${SUPABASE_URL}/rest/v1/plans?user_id=eq.${user.id}&order=created_at.desc`, {headers:db.h})
         .then(r=>r.json())
-        .then(d=>{ setMyPlans(Array.isArray(d) ? d : []); })
+        .then(d=>setMyPlans(Array.isArray(d)?d:[]))
         .catch(()=>setMyPlans([]));
     } else {
       setMyPlans([]);
     }
-    // Load persisted bio/avatar
-    try {
-      const profile = JSON.parse(localStorage.getItem("op_profile") || "{}");
-      if (profile.bio) setBio(profile.bio);
-      if (profile.avatar) setAvatar(profile.avatar);
-    } catch {}
+    // Cargar bio y avatar desde Supabase profiles
+    if (user?.id) {
+      db.getProfile(user.id).then(profile => {
+        if (profile?.bio) setBio(profile.bio);
+        if (profile?.avatar_url) setAvatar(profile.avatar_url);
+      });
+    }
   },[user?.id]);
+
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    setProfileMsg("");
+    // Subir avatar si es un File nuevo (viene del input file)
+    let avatarUrl = avatar;
+    if (avatarRef.current?._pendingFile) {
+      const uploaded = await db.uploadAvatar(avatarRef.current._pendingFile, user.id, user.token);
+      if (uploaded) avatarUrl = uploaded;
+      avatarRef.current._pendingFile = null;
+    }
+    await db.updateProfile(user.id, { bio, avatar_url: avatarUrl }, user.token);
+    setAvatar(avatarUrl);
+    setSavingProfile(false);
+    setProfileMsg(t.profileSaved);
+    setEditMode(false);
+    setTimeout(() => setProfileMsg(""), 3000);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm(t.deleteAccountConfirm)) return;
+    try {
+      const r = await fetch("/api/delete-account", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (r.ok) {
+        auth.clear();
+        onLogout();
+        alert(t.deleteAccountSuccess);
+      } else {
+        alert("No se pudo eliminar la cuenta. Inténtalo de nuevo.");
+      }
+    } catch {
+      alert("Error de conexión.");
+    }
+  };
 
   if (!isLoggedIn) return (
     <div style={{minHeight:"100vh",background:C.bg,paddingTop:52,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"52px 24px 40px"}}>
@@ -2003,18 +2169,20 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
         <input ref={avatarRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => {
           const f = e.target.files[0];
           if (!f) return;
+          // Guardar el File para subir al guardar
+          avatarRef.current._pendingFile = f;
+          // Preview local inmediato
           const reader = new FileReader();
           reader.onload = (ev) => setAvatar(ev.target.result);
           reader.readAsDataURL(f);
         }}/>
         <div style={{position:"absolute",top:12,right:12,display:"flex",gap:8}}>
-          <button onClick={()=>{
-            if (editMode) { try { localStorage.setItem("op_profile", JSON.stringify({bio, avatar})); } catch {} }
-            setEditMode(!editMode);
-          }} style={{background:editMode?C.black:C.bg,color:editMode?C.white:C.muted,border:`1px solid ${editMode?C.black:C.border}`,borderRadius:20,padding:"6px 14px",fontSize:12,cursor:"pointer",fontFamily:F,fontWeight:700}}>
-            {editMode?t.saveProfile:t.editProfile}
+          <button onClick={()=>{ if(editMode) handleSaveProfile(); else setEditMode(true); }}
+            style={{background:editMode?C.black:C.bg,color:editMode?C.white:C.muted,border:`1px solid ${editMode?C.black:C.border}`,borderRadius:20,padding:"6px 14px",fontSize:12,cursor:"pointer",fontFamily:F,fontWeight:700,opacity:savingProfile?0.6:1}}>
+            {savingProfile?"..." : editMode?t.saveProfile:t.editProfile}
           </button>
-          <button onClick={()=>{ if(window.confirm(t.logoutConfirm)) onLogout(); }} style={{background:"rgba(255,255,255,0.8)",border:"none",borderRadius:20,padding:"6px 14px",fontSize:12,color:C.muted,cursor:"pointer",fontFamily:F}}>{t.logout}</button>
+          <button onClick={()=>{ if(window.confirm(t.logoutConfirm)) onLogout(); }}
+            style={{background:"rgba(255,255,255,0.8)",border:"none",borderRadius:20,padding:"6px 14px",fontSize:12,color:C.muted,cursor:"pointer",fontFamily:F}}>{t.logout}</button>
         </div>
       </div>
 
@@ -2114,6 +2282,22 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
             ))}
           </div>
         </div>
+
+        {/* Mensaje de confirmación de guardado */}
+        {profileMsg && (
+          <div style={{background:"#D1FAE5",border:"1px solid #6EE7B7",borderRadius:12,padding:"12px 14px",fontSize:13,color:"#065F46",marginBottom:16,textAlign:"center",fontWeight:600}}>
+            {profileMsg}
+          </div>
+        )}
+
+        {/* Zona de peligro — eliminar cuenta */}
+        <div style={{borderTop:`1px solid ${C.border}`,paddingTop:20,marginTop:4}}>
+          <button onClick={handleDeleteAccount}
+            style={{background:"transparent",border:`1px solid #FCA5A5`,borderRadius:12,padding:"11px 16px",fontSize:13,color:"#B91C1C",cursor:"pointer",fontFamily:F,width:"100%",fontWeight:600}}>
+            🗑️ {t.deleteAccount}
+          </button>
+        </div>
+
       </div>
     </div>
   );
@@ -2225,8 +2409,26 @@ export default function App() {
   // Persist lang
   useEffect(()=>{ try{localStorage.setItem("op_lang",lang);}catch{} },[lang]);
 
-  // Restore session
-  useEffect(()=>{ const s=auth.load(); if(s?.token) setUser(s); },[]);
+  // Restore session con auto-refresh si el token ha caducado o caduca en <5 min
+  useEffect(() => {
+    const s = auth.load();
+    if (!s?.token) return;
+    const now = Math.floor(Date.now() / 1000);
+    const expiring = s.expires_at && s.expires_at < now + 300; // caduca en menos de 5 min
+    if (expiring && s.refresh) {
+      auth.refresh(s.refresh).then(data => {
+        if (data?.access_token) {
+          auth.save(data);
+          setUser({ ...s, token: data.access_token, expires_at: data.expires_at });
+        } else {
+          // Refresh fallido — limpiar sesión
+          auth.clear();
+        }
+      });
+    } else {
+      setUser(s);
+    }
+  }, []);
 
   // ── URL routing ──────────────────────────────────────────────────────────────
   // Convierte screen+params a una URL limpia
