@@ -2290,13 +2290,15 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
           </div>
         )}
 
-        {/* Zona de peligro — eliminar cuenta */}
-        <div style={{borderTop:`1px solid ${C.border}`,paddingTop:20,marginTop:4}}>
-          <button onClick={handleDeleteAccount}
-            style={{background:"transparent",border:`1px solid #FCA5A5`,borderRadius:12,padding:"11px 16px",fontSize:13,color:"#B91C1C",cursor:"pointer",fontFamily:F,width:"100%",fontWeight:600}}>
-            🗑️ {t.deleteAccount}
-          </button>
-        </div>
+        {/* Eliminar cuenta — solo visible en modo edición */}
+        {editMode && (
+          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:20,marginTop:4}}>
+            <button onClick={handleDeleteAccount}
+              style={{background:"transparent",border:`1px solid #FCA5A5`,borderRadius:12,padding:"11px 16px",fontSize:13,color:"#B91C1C",cursor:"pointer",fontFamily:F,width:"100%",fontWeight:600}}>
+              🗑️ {t.deleteAccount}
+            </button>
+          </div>
+        )}
 
       </div>
     </div>
@@ -2431,13 +2433,14 @@ export default function App() {
   }, []);
 
   // ── URL routing ──────────────────────────────────────────────────────────────
-  // Convierte screen+params a una URL limpia
   const screenToUrl = (s, params={}) => {
-    if (s === "detail" && params.planId) return `/p/${params.planId}`;
+    if (s === "detail"      && params.planId)  return `/p/${params.planId}`;
+    if (s === "userProfile" && params.userId)  return `/u/${params.userId}`;
+    if (s === "profile")                        return "/perfil";
     return "/";
   };
 
-  // Aplica un screen sin tocar el historial (usado por popstate)
+  // Aplica un screen sin tocar el historial (usado por popstate y mount)
   const applyScreen = (s, params={}) => {
     setScreen(s);
     setScreenParams(params);
@@ -2446,50 +2449,76 @@ export default function App() {
 
   const go = (s, params={}) => {
     applyScreen(s, params);
-    const url = screenToUrl(s, params);
-    window.history.pushState({screen:s, params}, "", url);
+    window.history.pushState({screen:s, params}, "", screenToUrl(s, params));
   };
 
   // Botón atrás del navegador
   useEffect(() => {
     const onPop = (e) => {
       const state = e.state;
-      if (state?.screen) {
-        // Si volvemos a un detail, necesitamos el plan en memoria
-        if (state.screen === "detail" && state.params?.planId && selectedPlan?.id === state.params.planId) {
+      if (!state?.screen) { applyScreen("feed", {}); return; }
+      // detail necesita el plan en memoria — si no lo tenemos, vamos al feed
+      if (state.screen === "detail") {
+        if (state.params?.planId && selectedPlan?.id === state.params.planId) {
           applyScreen("detail", state.params);
         } else {
-          applyScreen(state.screen === "detail" ? "feed" : state.screen, state.params||{});
+          applyScreen("feed", {});
         }
       } else {
-        applyScreen("feed", {});
+        applyScreen(state.screen, state.params||{});
       }
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, [selectedPlan]);
 
-  // Al montar: detectar si la URL es /p/{id} y cargar ese plan directamente
+  // Al montar: parsear la URL y restaurar la pantalla correcta
   useEffect(() => {
     const path = window.location.pathname;
-    const match = path.match(/^\/p\/([a-f0-9-]{36})$/i);
-    if (match) {
-      const planId = match[1];
-      db.getPlanById(planId).then(plan => {
+
+    // /p/{uuid} → plan detail
+    const planMatch = path.match(/^\/p\/([a-f0-9-]{36})$/i);
+    if (planMatch) {
+      db.getPlanById(planMatch[1]).then(plan => {
         if (plan) {
           setSelectedPlan(plan);
-          applyScreen("detail", {planId: plan.id, from:"feed"});
-          window.history.replaceState({screen:"detail", params:{planId:plan.id, from:"feed"}}, "", `/p/${plan.id}`);
+          const params = {planId: plan.id, from:"feed"};
+          applyScreen("detail", params);
+          window.history.replaceState({screen:"detail", params}, "", `/p/${plan.id}`);
         } else {
-          // Plan no encontrado → ir al feed
           applyScreen("feed", {});
           window.history.replaceState({screen:"feed", params:{}}, "", "/");
         }
       });
-    } else {
-      // URL normal → iniciar en feed y registrar estado inicial
-      window.history.replaceState({screen:"feed", params:{}}, "", "/");
+      return;
     }
+
+    // /u/{uuid} → perfil público
+    const userMatch = path.match(/^\/u\/([a-f0-9-]{36})$/i);
+    if (userMatch) {
+      const userId = userMatch[1];
+      const params = {userId, from:"feed"};
+      applyScreen("userProfile", params);
+      window.history.replaceState({screen:"userProfile", params}, "", `/u/${userId}`);
+      return;
+    }
+
+    // /perfil → perfil propio (requiere auth; si no hay sesión, feed)
+    if (path === "/perfil") {
+      const s = auth.load();
+      if (s?.token) {
+        applyScreen("profile", {});
+        window.history.replaceState({screen:"profile", params:{}}, "", "/perfil");
+      } else {
+        applyScreen("feed", {});
+        window.history.replaceState({screen:"feed", params:{}}, "", "/");
+      }
+      return;
+    }
+
+    // Cualquier otra URL → feed
+    applyScreen("feed", {});
+    window.history.replaceState({screen:"feed", params:{}}, "", "/");
   }, []);
   const requireAuth = () => setShowAuth("register");
   const handleUpload = () => { if(!user){setShowAuth("register");return;} setShowUpload(true); };
