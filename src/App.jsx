@@ -33,6 +33,11 @@ const T = {
     reportBtn: "Reportar", reportSent: "Recibido, gracias.",
     when: "¿Cuándo y cuánto tiempo?", whenSub: "Para ajustar el plan",
     whereFrom: "¿Desde dónde salís?", whereFromSub: "Escribe tu ciudad de origen",
+    whereDestination: "¿Dónde queréis ir?", whereDestPh: "Ciudad, pueblo, playa, montaña...",
+    whereOrigin: "¿Desde dónde salís?", whereOriginPh: "Opcional · Tu ciudad de origen",
+    whereAtLeastOne: "Indica al menos el destino o el origen para continuar.",
+    publishDraft: "Publicar en el feed", draftLabel: "Borrador",
+    photoCredit: "Foto de",
     whosComing: "¿Quién viene?", whosComingSub: "El plan cambia según esto",
     haveCar: "¿Tenéis coche?", haveCarSub: "Determina los destinos posibles",
     budget: "¿Presupuesto por persona?", budgetSub: "Aproximado para el día",
@@ -134,6 +139,11 @@ const T = {
     reportBtn: "Reportar", reportSent: "Rebut, gràcies.",
     when: "Quan i quant temps?", whenSub: "Per ajustar el pla",
     whereFrom: "Des d'on sortiu?", whereFromSub: "Escriu la teva ciutat d'origen",
+    whereDestination: "On voleu anar?", whereDestPh: "Ciutat, poble, platja, muntanya...",
+    whereOrigin: "Des d'on sortiu?", whereOriginPh: "Opcional · La vostra ciutat d'origen",
+    whereAtLeastOne: "Indica almenys la destinació o l'origen per continuar.",
+    publishDraft: "Publicar al feed", draftLabel: "Esborrany",
+    photoCredit: "Foto de",
     whosComing: "Qui ve?", whosComingSub: "El pla canvia segons això",
     haveCar: "Teniu cotxe?", haveCarSub: "Determina les destinacions possibles",
     budget: "Pressupost per persona?", budgetSub: "Aproximat per al dia",
@@ -226,7 +236,7 @@ const T = {
 
 
 const QUESTIONS = [
-  { id:"location", emoji:"📍", type:"text" },
+  { id:"location", emoji:"📍", type:"location-pair" },
   { id:"group", emoji:"👥", type:"opts", opts:[{v:"pareja",i:"💑"},{v:"amigos",i:"🎉"},{v:"familia",i:"👨‍👩‍👧"},{v:"solo",i:"🚶"}] },
   { id:"transport", emoji:"🚗", type:"opts", opts:[{v:"yes",i:"🚗"},{v:"no",i:"🚇"}] },
   { id:"budget", emoji:"💰", type:"opts", opts:[{v:"low",i:"🤏",s:"< 30€"},{v:"mid",i:"👍",s:"30–80€"},{v:"high",i:"✨",s:"> 80€"}] },
@@ -238,8 +248,17 @@ const db = {
   h: { apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}`, "Content-Type":"application/json" },
   ah: (t) => ({ apikey:SUPABASE_KEY, Authorization:`Bearer ${t}`, "Content-Type":"application/json" }),
 
+  async publishPlan(id, token) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/plans?id=eq.${id}`, {
+      method: "PATCH",
+      headers: { ...this.ah(token), Prefer: "return=representation" },
+      body: JSON.stringify({ is_published: true }),
+    });
+    return r.ok;
+  },
+
   async getPlans(filter="all", advFilters={}, sortRandom=false) {
-    let url = `${SUPABASE_URL}/rest/v1/plans?is_approved=eq.true&order=votes_count.desc&limit=50`;
+    let url = `${SUPABASE_URL}/rest/v1/plans?is_approved=eq.true&is_published=eq.true&order=votes_count.desc&limit=50`;
 
     // Filtro de categoría (barra rápida del feed)
     const catMap = {
@@ -551,13 +570,17 @@ function Btn({children,onClick,variant="black",style={}}) {
 }
 
 // ── Photo Carousel ────────────────────────────────────────────────────────────
+// Normaliza una entrada de photos: acepta string URL o {url, photographer, ...}
+const photoUrl  = (p) => (typeof p === "string" ? p : p?.url) || null;
+const photoCred = (p) => (typeof p === "object" && p?.photographer) ? p : null;
+
 function PhotoCarousel({photos, fallback, height=220, emoji=""}) {
   const [idx, setIdx] = useState(0);
   const touchStartX = useRef(0);
 
-  const validUrl = (u) => typeof u === "string" && u.startsWith("http");
+  const validUrl = (u) => { const s = photoUrl(u); return typeof s === "string" && s.startsWith("http"); };
   const photoList = Array.isArray(photos) ? photos.filter(validUrl) : [];
-  const fallbackUrl = validUrl(fallback) ? fallback : null;
+  const fallbackUrl = (typeof fallback === "string" && fallback.startsWith("http")) ? fallback : null;
   const imgs = photoList.length > 0 ? photoList : (fallbackUrl ? [fallbackUrl] : []);
 
   if (!imgs.length) {
@@ -576,12 +599,21 @@ function PhotoCarousel({photos, fallback, height=220, emoji=""}) {
     if (Math.abs(diff) > 40) { diff > 0 ? next() : prev(); }
   };
 
+  const currentCred = photoCred(imgs[idx]);
+
   return (
     <div style={{position:"relative", height, overflow:"hidden", background:`linear-gradient(135deg,${C.accent}30,${C.accent}10)`}}
       onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-      <img src={imgs[idx]} alt="" style={{width:"100%", height:"100%", objectFit:"cover"}}
+      <img src={photoUrl(imgs[idx])} alt="" style={{width:"100%", height:"100%", objectFit:"cover"}}
         onError={e => { e.target.style.display = "none"; }}/>
       <div style={{position:"absolute", inset:0, background:"linear-gradient(to top,rgba(0,0,0,0.45) 0%,transparent 55%)"}}/>
+      {currentCred && (
+        <a href={currentCred.photographerUrl} target="_blank" rel="noopener noreferrer"
+          onClick={e=>e.stopPropagation()}
+          style={{position:"absolute",bottom:8,right:10,fontSize:9,color:"rgba(255,255,255,0.65)",textDecoration:"none",background:"rgba(0,0,0,0.3)",padding:"2px 6px",borderRadius:6,backdropFilter:"blur(4px)"}}>
+          Foto de {currentCred.photographer} · Unsplash
+        </a>
+      )}
       {imgs.length > 1 && (
         <>
           <button onClick={prev} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,0.8)",border:"none",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
@@ -1840,7 +1872,7 @@ function TimeSelector({t, onComplete}) {
         {sel&&<div style={{marginTop:10,textAlign:"center",fontSize:13,color:C.accentText,fontWeight:700,background:C.accent+"25",borderRadius:8,padding:"6px"}}>{mode==="custom"&&!end?"Selecciona el día de vuelta":`✓ ${dur} seleccionado`}</div>}
       </div>
 
-      {mode!=="weekend" && (
+      {(mode==="day" || (mode==="custom" && (!sel || !end || sel===end))) && (
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:16,marginBottom:18}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <span style={{fontSize:14,fontWeight:800,color:C.black,fontFamily:F}}>⏰ Horas disponibles</span>
@@ -1882,6 +1914,9 @@ function QuizScreen({t, timeData, onComplete, onBack}) {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({});
   const [txt, setTxt] = useState("");
+  const [dest, setDest] = useState("");
+  const [orig, setOrig] = useState("");
+  const [locationError, setLocationError] = useState(false);
   const q = QUESTIONS[step];
 
   const labels = {
@@ -1892,7 +1927,6 @@ function QuizScreen({t, timeData, onComplete, onBack}) {
   };
 
   const qData = {
-    location:{q:t.whereFrom,sub:t.whereFromSub},
     group:{q:t.whosComing,sub:t.whosComingSub},
     transport:{q:t.haveCar,sub:t.haveCarSub},
     budget:{q:t.budget,sub:t.budgetSub},
@@ -1906,6 +1940,25 @@ function QuizScreen({t, timeData, onComplete, onBack}) {
     else onComplete(a);
   };
 
+  const handleLocationContinue = () => {
+    const d = dest.trim()||null;
+    const o = orig.trim()||null;
+    if (!d && !o) { setLocationError(true); return; }
+    setLocationError(false);
+    const a = {...answers, destination:d, origin:o};
+    setAnswers(a);
+    if (step < QUESTIONS.length-1) { setStep(step+1); }
+    else onComplete(a);
+  };
+
+  // Chip de resumen del tiempo — no muestra horas para planes multi-día
+  const isMultiDay = timeData && (timeData.mode==="weekend" || (timeData.mode==="custom" && timeData.endDate && timeData.date && timeData.endDate > timeData.date));
+  const timeChip = timeData ? (
+    <div style={{background:C.accent+"20",border:`1px solid ${C.accent}`,borderRadius:12,padding:"10px 14px",fontSize:12,color:C.accentText,fontWeight:700,marginBottom:20}}>
+      {timeData.mode==="weekend" ? "📅 Fin de semana" : timeData.mode==="custom" && isMultiDay ? `📅 ${timeData.endDate-timeData.date+1} días` : `📅 1 día · ⏰ ${String(timeData.startHour||9).padStart(2,"0")}:00 → ${String(timeData.endHour||20).padStart(2,"0")}:00`}
+    </div>
+  ) : null;
+
   return (
     <div style={{minHeight:"100vh",background:C.bg,paddingTop:52}}>
       <div style={{height:3,background:C.border}}>
@@ -1916,31 +1969,54 @@ function QuizScreen({t, timeData, onComplete, onBack}) {
           <button onClick={()=>step>0?setStep(step-1):onBack()} style={{background:"transparent",border:"none",color:C.muted,cursor:"pointer",fontSize:14,fontFamily:F}}>{t.back}</button>
           <span style={{fontSize:12,color:C.dim,fontWeight:600}}>{step+1} / {QUESTIONS.length}</span>
         </div>
-        {timeData&&<div style={{background:C.accent+"20",border:`1px solid ${C.accent}`,borderRadius:12,padding:"10px 14px",fontSize:12,color:C.accentText,fontWeight:700,marginBottom:20}}>📅 {timeData.mode==="weekend"?"Fin de semana":"1 día"} · ⏰ {String(timeData.startHour||9).padStart(2,"0")}:00 → {String(timeData.endHour||20).padStart(2,"0")}:00</div>}
+        {timeChip}
         <div style={{fontSize:40,marginBottom:14}}>{q.emoji}</div>
-        <h2 style={{fontFamily:F,fontSize:24,fontWeight:900,color:C.black,marginBottom:8,lineHeight:1.2,letterSpacing:-0.3}}>{qData.q}</h2>
-        <p style={{fontSize:14,color:C.muted,marginBottom:26}}>{qData.sub}</p>
-        {q.type==="text"?(
+
+        {q.type==="location-pair" ? (
           <div>
-            <input value={txt} onChange={e=>setTxt(e.target.value)} placeholder="Barcelona, Madrid, Sevilla..." onKeyDown={e=>e.key==="Enter"&&txt.trim()&&answer(txt)}
-              style={{width:"100%",background:C.card,border:`2px solid ${txt?C.accent:C.border}`,borderRadius:14,padding:"15px 18px",fontSize:15,color:C.black,outline:"none",marginBottom:14,boxSizing:"border-box",fontFamily:F,transition:"border-color 0.2s"}}/>
-            <Btn onClick={()=>txt.trim()&&answer(txt)} variant={txt.trim()?"black":"ghost"} style={{width:"100%",padding:"15px",fontSize:15,borderRadius:14}}>{t.next}</Btn>
+            <h2 style={{fontFamily:F,fontSize:24,fontWeight:900,color:C.black,marginBottom:24,lineHeight:1.2,letterSpacing:-0.3}}>¿A dónde vais?</h2>
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:6,textTransform:"uppercase",letterSpacing:0.5}}>📍 {t.whereDestination}</div>
+              <input value={dest} onChange={e=>{setDest(e.target.value);setLocationError(false);}} placeholder={t.whereDestPh}
+                onKeyDown={e=>e.key==="Enter"&&handleLocationContinue()}
+                style={{width:"100%",background:C.card,border:`2px solid ${dest?C.accent:C.border}`,borderRadius:14,padding:"15px 18px",fontSize:15,color:C.black,outline:"none",boxSizing:"border-box",fontFamily:F,transition:"border-color 0.2s"}}/>
+            </div>
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:6,textTransform:"uppercase",letterSpacing:0.5}}>🚗 {t.whereOrigin} <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>· {t.whereOriginPh.split("·")[0].trim()}</span></div>
+              <input value={orig} onChange={e=>setOrig(e.target.value)} placeholder={t.whereOriginPh.split("·")[1]?.trim()||"Barcelona, Madrid..."}
+                onKeyDown={e=>e.key==="Enter"&&handleLocationContinue()}
+                style={{width:"100%",background:C.card,border:`2px solid ${orig?C.accent:C.border}`,borderRadius:14,padding:"15px 18px",fontSize:15,color:C.black,outline:"none",boxSizing:"border-box",fontFamily:F,transition:"border-color 0.2s"}}/>
+            </div>
+            {locationError && <div style={{fontSize:13,color:"#c0392b",marginBottom:12,fontWeight:600}}>{t.whereAtLeastOne}</div>}
+            <Btn onClick={handleLocationContinue} variant={(dest||orig)?"black":"ghost"} style={{width:"100%",padding:"15px",fontSize:15,borderRadius:14}}>{t.next}</Btn>
           </div>
-        ):(
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {q.opts.map(o=>(
-              <button key={o.v} onClick={()=>answer(o.v)}
-                style={{background:C.card,border:`2px solid ${C.border}`,borderRadius:14,padding:"14px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,color:C.black,transition:"all 0.15s",fontFamily:F}}
-                onMouseEnter={e=>{e.currentTarget.style.borderColor=C.accent;e.currentTarget.style.background=C.accent+"15";}}
-                onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.background=C.card;}}>
-                <span style={{fontSize:26}}>{o.i}</span>
-                <div>
-                  <div style={{fontSize:15,fontWeight:700}}>{labels[q.id]?.[o.v]||o.v}</div>
-                  {o.s&&<div style={{fontSize:12,color:C.muted}}>{o.s}</div>}
-                </div>
-              </button>
-            ))}
-          </div>
+        ) : (
+          <>
+            <h2 style={{fontFamily:F,fontSize:24,fontWeight:900,color:C.black,marginBottom:8,lineHeight:1.2,letterSpacing:-0.3}}>{qData?.q}</h2>
+            <p style={{fontSize:14,color:C.muted,marginBottom:26}}>{qData?.sub}</p>
+            {q.type==="text" ? (
+              <div>
+                <input value={txt} onChange={e=>setTxt(e.target.value)} placeholder="Barcelona, Madrid, Sevilla..." onKeyDown={e=>e.key==="Enter"&&txt.trim()&&answer(txt)}
+                  style={{width:"100%",background:C.card,border:`2px solid ${txt?C.accent:C.border}`,borderRadius:14,padding:"15px 18px",fontSize:15,color:C.black,outline:"none",marginBottom:14,boxSizing:"border-box",fontFamily:F,transition:"border-color 0.2s"}}/>
+                <Btn onClick={()=>txt.trim()&&answer(txt)} variant={txt.trim()?"black":"ghost"} style={{width:"100%",padding:"15px",fontSize:15,borderRadius:14}}>{t.next}</Btn>
+              </div>
+            ) : (
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {q.opts.map(o=>(
+                  <button key={o.v} onClick={()=>answer(o.v)}
+                    style={{background:C.card,border:`2px solid ${C.border}`,borderRadius:14,padding:"14px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,color:C.black,transition:"all 0.15s",fontFamily:F}}
+                    onMouseEnter={e=>{e.currentTarget.style.borderColor=C.accent;e.currentTarget.style.background=C.accent+"15";}}
+                    onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.background=C.card;}}>
+                    <span style={{fontSize:26}}>{o.i}</span>
+                    <div>
+                      <div style={{fontSize:15,fontWeight:700}}>{labels[q.id]?.[o.v]||o.v}</div>
+                      {o.s&&<div style={{fontSize:12,color:C.muted}}>{o.s}</div>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -1997,8 +2073,10 @@ function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error, user, onRe
         lon:           plan.lon           || null,
         stops:         Array.isArray(plan.stops) ? plan.stops : [],
         tips:          Array.isArray(plan.tips)  ? plan.tips  : [],
-        photos: [], image_url: null,
+        photos: Array.isArray(plan.photos) ? plan.photos : [],
+        image_url: plan.image_url || null,
         is_ai_generated: true,
+        is_published: false,
         user_id: user.id,
         author_name:       user.name   || null,
         author_avatar_url: user.avatar || null,
@@ -2229,31 +2307,46 @@ function ProfileScreen({t, lang, setLang, onUpload, isLoggedIn, onLogin, user, o
           <div style={{marginBottom:24}}>
             <h3 style={{fontFamily:F,fontSize:15,fontWeight:800,color:C.black,marginBottom:12}}>Mis planes</h3>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              {myPlans.map((p,i)=>(
-                <div key={i} style={{borderRadius:14,overflow:"hidden",background:C.card,border:`1px solid ${C.border}`,cursor:"pointer",position:"relative"}}
-                  onClick={()=>onPlanClick&&onPlanClick(p)}>
-                  {(() => {
-                    const src = p.img || (Array.isArray(p.photos) && p.photos[0]) || null;
-                    return src
-                      ? <img src={src} alt="" style={{width:"100%",height:100,objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
-                      : <div style={{width:"100%",height:100,background:`linear-gradient(135deg,${C.accent}40,${C.accent}20)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>{p.emoji||"🗺️"}</div>;
-                  })()}
-                  <div style={{padding:"8px 10px 10px"}}>
-                    <div style={{fontSize:12,fontWeight:700,color:C.black,lineHeight:1.3,marginBottom:2,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{p.title}</div>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <span style={{fontSize:10,color:C.muted}}>{p.zone}</span>
-                      <span style={{fontSize:10,color:C.accentText}}>{p.is_ai_generated?"✦ IA":"📝"}</span>
+              {myPlans.map((p,i)=>{
+                const isDraft = p.is_ai_generated && !p.is_published;
+                const thumbSrc = p.img || photoUrl(Array.isArray(p.photos) ? p.photos[0] : null) || null;
+                return (
+                  <div key={i} style={{borderRadius:14,overflow:"hidden",background:C.card,border:`1.5px solid ${isDraft?C.accent:C.border}`,cursor:"pointer",position:"relative"}}
+                    onClick={()=>onPlanClick&&onPlanClick(p)}>
+                    {thumbSrc
+                      ? <img src={thumbSrc} alt="" style={{width:"100%",height:100,objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
+                      : <div style={{width:"100%",height:100,background:`linear-gradient(135deg,${C.accent}40,${C.accent}20)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>{p.emoji||"🗺️"}</div>}
+                    {isDraft && (
+                      <div style={{position:"absolute",top:6,left:6,background:C.accent,color:C.accentText,fontSize:9,fontWeight:800,padding:"2px 7px",borderRadius:10,textTransform:"uppercase",letterSpacing:0.5}}>Borrador</div>
+                    )}
+                    <div style={{padding:"8px 10px 10px"}}>
+                      <div style={{fontSize:12,fontWeight:700,color:C.black,lineHeight:1.3,marginBottom:2,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{p.title}</div>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <span style={{fontSize:10,color:C.muted}}>{p.zone||p.location_name}</span>
+                        <span style={{fontSize:10,color:C.accentText}}>{p.is_ai_generated?"✦ IA":"📝"}</span>
+                      </div>
                     </div>
+                    {isDraft && (
+                      <button onClick={async e=>{
+                        e.stopPropagation();
+                        if (!window.confirm("¿Publicar este plan en el feed? Una vez publicado será visible para todos.")) return;
+                        const ok = await db.publishPlan(p.id, user.token);
+                        if (ok) setMyPlans(prev=>prev.map(x=>x.id===p.id?{...x,is_published:true}:x));
+                      }}
+                        style={{width:"100%",background:C.black,color:C.white,border:"none",padding:"7px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>
+                        Publicar en el feed →
+                      </button>
+                    )}
+                    <button onClick={async e=>{
+                      e.stopPropagation();
+                      if (!window.confirm("¿Seguro que quieres eliminar este plan? Esta acción no se puede deshacer.")) return;
+                      const ok = await db.deletePlan(p, user.token);
+                      if (ok) setMyPlans(prev => prev.filter(x => x.id !== p.id));
+                    }}
+                      style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,0.5)",border:"none",borderRadius:"50%",width:22,height:22,cursor:"pointer",fontSize:11,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
                   </div>
-                  <button onClick={async e=>{
-                    e.stopPropagation();
-                    if (!window.confirm("¿Seguro que quieres eliminar este plan? Esta acción no se puede deshacer.")) return;
-                    const ok = await db.deletePlan(p, user.token);
-                    if (ok) setMyPlans(prev => prev.filter(x => x.id !== p.id));
-                  }}
-                    style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,0.5)",border:"none",borderRadius:"50%",width:22,height:22,cursor:"pointer",fontSize:11,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -2330,7 +2423,7 @@ function UserProfileScreen({userId, userName, t, onBack, onPlanClick}) {
       }).catch(()=>{});
     }
 
-    fetch(`${SUPABASE_URL}/rest/v1/plans?user_id=eq.${userId}&is_approved=eq.true&order=votes_count.desc`, {
+    fetch(`${SUPABASE_URL}/rest/v1/plans?user_id=eq.${userId}&is_approved=eq.true&is_published=eq.true&order=votes_count.desc`, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
     })
       .then(r=>r.json())
@@ -2350,7 +2443,7 @@ function UserProfileScreen({userId, userName, t, onBack, onPlanClick}) {
   const initial = name[0].toUpperCase();
 
   const getPlanImage = (p) => {
-    if (Array.isArray(p.photos) && p.photos.length > 0) return p.photos[0];
+    if (Array.isArray(p.photos) && p.photos.length > 0) return photoUrl(p.photos[0]);
     if (p.image_url) return p.image_url;
     if (p.img) return p.img;
     return null;
