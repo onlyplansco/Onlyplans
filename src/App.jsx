@@ -1981,18 +1981,27 @@ function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error, user, onRe
     try {
       // Valores por defecto seguros para campos opcionales que puede omitir la IA (Punto 3)
       const planData = {
-        title:     plan.title     || "Plan generado",
-        subtitle:  plan.subtitle  || "",
-        zone:      plan.zone      || "",
-        emoji:     plan.emoji     || "🗺️",
-        vibe:      ["relax","aventura","social"].includes(plan.vibe) ? plan.vibe : "social",
-        budget:    plan.budget    || "mid",
-        transport: plan.transport || "yes",
-        stops:     Array.isArray(plan.stops) ? plan.stops : [],
-        tips:      Array.isArray(plan.tips)  ? plan.tips  : [],
+        title:         plan.title         || "Plan generado",
+        subtitle:      plan.subtitle      || "",
+        zone:          plan.zone          || "",
+        emoji:         plan.emoji         || "🗺️",
+        vibe:          ["relax","aventura","social"].includes(plan.vibe) ? plan.vibe : "social",
+        categories:    Array.isArray(plan.categories) && plan.categories.length ? plan.categories : ["ciudad"],
+        tags:          Array.isArray(plan.tags) ? plan.tags : [],
+        budget:        ["low","mid","high"].includes(plan.budget) ? plan.budget : "mid",
+        duration_type: plan.duration_type || "dia-completo",
+        location_name: plan.location_name || null,
+        province:      plan.province      || null,
+        community:     plan.community     || null,
+        lat:           plan.lat           || null,
+        lon:           plan.lon           || null,
+        stops:         Array.isArray(plan.stops) ? plan.stops : [],
+        tips:          Array.isArray(plan.tips)  ? plan.tips  : [],
         photos: [], image_url: null,
         is_ai_generated: true,
         user_id: user.id,
+        author_name:       user.name   || null,
+        author_avatar_url: user.avatar || null,
       };
       // Punto 2: solo marcar como guardado si Supabase confirma el INSERT
       const result = await db.submitPlan(planData, user.token);
