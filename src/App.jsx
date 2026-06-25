@@ -2110,11 +2110,15 @@ function GeneratedPlan({plan, answers, t, onBack, onRegen, go, error, user, onRe
         </div>
         {plan&&(
           <>
-            <div style={{background:C.black,borderRadius:20,padding:22,marginBottom:20}}>
-              <div style={{fontSize:40,marginBottom:12}}>{plan.emoji||"🗺️"}</div>
-              <h1 style={{fontFamily:F,fontSize:20,fontWeight:900,color:C.white,marginBottom:8,lineHeight:1.2}}>{plan.title}</h1>
-              <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",marginBottom:10}}>{plan.subtitle}</p>
-              <div style={{fontSize:12,color:C.accent,fontWeight:700}}>📍 {plan.zone}</div>
+            <div style={{borderRadius:20,overflow:"hidden",marginBottom:20,position:"relative"}}>
+              <PhotoCarousel photos={plan.photos} fallback={plan.image_url} height={220} emoji={plan.emoji}/>
+              <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,0.7) 0%,transparent 50%)",borderRadius:20,pointerEvents:"none"}}/>
+              <div style={{position:"absolute",bottom:0,left:0,right:0,padding:20,pointerEvents:"none"}}>
+                <div style={{fontSize:32,marginBottom:8}}>{plan.emoji||"🗺️"}</div>
+                <h1 style={{fontFamily:F,fontSize:20,fontWeight:900,color:"#fff",marginBottom:6,lineHeight:1.2}}>{plan.title}</h1>
+                <p style={{fontSize:13,color:"rgba(255,255,255,0.7)",marginBottom:6}}>{plan.subtitle}</p>
+                <div style={{fontSize:12,color:C.accent,fontWeight:700}}>📍 {plan.zone}</div>
+              </div>
             </div>
             <h2 style={{fontFamily:F,fontSize:17,fontWeight:800,color:C.black,marginBottom:16}}>{t.planDay}</h2>
             <div style={{marginBottom:20}}>
